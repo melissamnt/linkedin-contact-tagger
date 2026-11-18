@@ -304,8 +304,9 @@ export function filterTags(known, applied, query) {
 }
 
 // Every tag — known ones plus any applied tag not known yet — whose name
-// (or its family) contains `query`, grouped by family A–Z, each flagged
-// with whether it's on the contact.
+// (or its family) contains `query`: families A–Z with their tags first, then
+// tags without a family A–Z. Each row says whether it's on the contact and
+// whether it belongs to a family.
 export function listAllTags(known, applied, query) {
   const q = query.trim().toLowerCase();
   const selected = new Set(applied.map((t) => t.toLowerCase()));
@@ -314,10 +315,14 @@ export function listAllTags(known, applied, query) {
     const key = tag.toLowerCase();
     if (!byKey.has(key)) byKey.set(key, tag); // applied spelling wins
   }
+  // Families (with their tags, and the family's own tag if used) come first,
+  // then tags without a family.
+  const families = new Set([...byKey.values()].filter((t) => tagFamily(t)).map(familyKeyOf));
+  const inFamily = (tag) => families.has(familyKeyOf(tag));
   return [...byKey.entries()]
     .filter(([key]) => key.includes(q))
-    .sort(([, a], [, b]) => familyGroupCompare(a, b))
-    .map(([key, tag]) => ({ tag, selected: selected.has(key) }));
+    .sort(([, a], [, b]) => inFamily(b) - inFamily(a) || familyGroupCompare(a, b))
+    .map(([key, tag]) => ({ tag, selected: selected.has(key), inFamily: inFamily(tag) }));
 }
 
 export function getKnownTags() {

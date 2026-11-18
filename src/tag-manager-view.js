@@ -5,10 +5,12 @@
 
 import {
   elTagManagerEmpty,
+  elTagManagerExpandAll,
   elTagManagerList,
   elTagManagerLoading,
   elTagManagerSort,
   elTagManagerToggle,
+  elTagManagerToolbar,
   showView,
 } from "./dom.js";
 import { fetchAllRecords, renameFamilyRemote, renameTagRemote } from "./sheet-sync.js";
@@ -40,6 +42,11 @@ import {
 let tmRecords = [];
 let sortMode = "count"; // "count" | "az" | "za" — kept while the panel is open
 let editing = null; // { kind: "family", label } | { kind: "tag", tag } | null
+// Families start collapsed; open ones are kept (by lowercase name) while the panel is open.
+const expanded = new Set();
+
+const CHEVRON =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
 
 const PENCIL =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
@@ -54,9 +61,33 @@ function isEditing(kind, value) {
   return editing?.kind === kind && (kind === "family" ? editing.label === value : editing.tag === value);
 }
 
-function tagRow({ label, count, colorTag, child, editKind, editValue, editLabel }) {
+function tagRow({ label, count, colorTag, child, editKind, editValue, editLabel, familyKey }) {
   const row = document.createElement("div");
   row.className = `tm-row${child ? " is-child" : ""}`;
+
+  // Families get an expand / collapse arrow; other top-level rows a same-width
+  // spacer so every dot lines up.
+  if (!child) {
+    if (familyKey) {
+      const open = expanded.has(familyKey);
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = `tm-toggle${open ? " is-open" : ""}`;
+      toggle.setAttribute("aria-expanded", String(open));
+      toggle.setAttribute("aria-label", `${open ? "Collapse" : "Expand"} ${label}`);
+      toggle.innerHTML = CHEVRON;
+      toggle.addEventListener("click", () => {
+        if (open) expanded.delete(familyKey);
+        else expanded.add(familyKey);
+        renderTagList();
+      });
+      row.appendChild(toggle);
+    } else {
+      const spacer = document.createElement("span");
+      spacer.className = "tm-toggle-spacer";
+      row.appendChild(spacer);
+    }
+  }
 
   const dot = document.createElement("span");
   dot.className = `tag-list-dot ${tagColorClass(colorTag)}`;
@@ -93,13 +124,19 @@ function renderTagList() {
   elTagManagerList.innerHTML = "";
   elTagManagerEmpty.hidden = tree.length > 0;
 
+  const families = tree.filter((n) => n.children.length);
+  elTagManagerExpandAll.hidden = families.length === 0;
+  const allOpen = families.length > 0 && families.every((n) => expanded.has(n.key));
+  elTagManagerExpandAll.textContent = allOpen ? "Collapse all" : "Expand all";
+
   for (const node of tree) {
     if (node.children.length) {
-      // a family, with its tags indented underneath
+      // a family; its tags are indented underneath while it's expanded
       elTagManagerList.appendChild(
-        tagRow({ label: node.label, count: node.count, colorTag: node.label, editKind: "family", editValue: node.label, editLabel: node.label })
+        tagRow({ label: node.label, count: node.count, colorTag: node.label, editKind: "family", editValue: node.label, editLabel: node.label, familyKey: node.key })
       );
       if (isEditing("family", node.label)) elTagManagerList.appendChild(buildFamilyEditor(node.label));
+      if (!expanded.has(node.key)) continue;
       for (const child of node.children) {
         elTagManagerList.appendChild(
           tagRow({ label: child.label, count: child.count, colorTag: child.tag, child: true, editKind: "tag", editValue: child.tag, editLabel: child.tag })
@@ -263,16 +300,27 @@ function buildTagEditor(tag) {
     },
     family ? "Family color" : "Color"
   );
-  // Until a color is picked, preview the color the tag will have where it's going.
   const target = () => {
     const f = familyField.input.value.trim();
     const n = nameField.input.value.trim();
     return matchFamilySpelling(f ? `${f}${FAMILY_SEPARATOR}${n}` : n, allTags());
   };
+  // A family that already has a color: an existing family, or a tag without
+  // one that's about to become a family (they share the color key).
+  const existingFamily = () => {
+    const key = familyField.input.value.trim().toLowerCase();
+    if (!key) return null;
+    return buildTagTree(tmRecords).find((n) => n.key === key)?.label || null;
+  };
+  // Until a color is picked: typing an existing family's name previews that
+  // family's color. Anything else (a new family still being typed, or no
+  // family) keeps the tag's current color — it never changes per keystroke.
+  const startColor = colorIndex;
   familyField.input.addEventListener("input", () => {
     picker.label.textContent = familyField.input.value.trim() ? "Family color" : "Color";
     if (colorTouched) return;
-    colorIndex = tagColorIndex(target() || tag);
+    const match = existingFamily();
+    colorIndex = match ? tagColorIndex(match) : startColor;
     picker.render();
   });
 
@@ -287,7 +335,9 @@ function buildTagEditor(tag) {
       const to = target();
       const problem = validateTagName(to, tag, allTags());
       if (problem) return problem;
-      await saveTagEdit(tag, to, colorIndex, colorTouched);
+      // A brand-new family takes the color shown, rather than one of its own.
+      const newFamily = Boolean(familyField.input.value.trim()) && !existingFamily();
+      await saveTagEdit(tag, to, colorIndex, colorTouched || newFamily);
       return null;
     }
   );
@@ -345,6 +395,7 @@ async function saveFamilyEdit(from, to, colorIndex) {
   await renameFamilyRemote(from, to);
   await renameFamilyInLocalRecords(from, to);
   await renameFamilyColor(from, to, colorIndex);
+  if (expanded.delete(from.toLowerCase())) expanded.add(to.toLowerCase());
   renameKnownFamily(from, to);
   applyTagsChange((tags) => renameFamilyInList(tags, from, to));
   tmRecords = tmRecords.map((r) => (r.tags ? { ...r, tags: renameFamilyInList(r.tags, from, to) } : r));
@@ -359,7 +410,7 @@ async function openTagManager() {
   elTagManagerList.innerHTML = "";
   elTagManagerEmpty.hidden = true;
   renderSort();
-  elTagManagerSort.hidden = true;
+  elTagManagerToolbar.hidden = true;
   elTagManagerLoading.hidden = false;
 
   let records;
@@ -368,7 +419,7 @@ async function openTagManager() {
   } finally {
     if (myToken === loadToken) {
       elTagManagerLoading.hidden = true;
-      elTagManagerSort.hidden = false;
+      elTagManagerToolbar.hidden = false;
     }
   }
   if (myToken !== loadToken) return;
@@ -379,6 +430,15 @@ async function openTagManager() {
 
 export function initTagManagerView() {
   elTagManagerToggle.addEventListener("click", openTagManager);
+  elTagManagerExpandAll.addEventListener("click", () => {
+    const families = buildTagTree(tmRecords).filter((n) => n.children.length);
+    const allOpen = families.every((n) => expanded.has(n.key));
+    for (const n of families) {
+      if (allOpen) expanded.delete(n.key);
+      else expanded.add(n.key);
+    }
+    renderTagList();
+  });
   elTagManagerSort.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-sort]");
     if (!btn) return;

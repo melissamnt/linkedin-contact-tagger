@@ -53,7 +53,9 @@ export const elBrowseBackBtn = $("browseBackBtn");
 // Tag manager
 export const elTagManagerToggle = $("tagManagerToggle");
 export const elTagManagerLoading = $("tagManagerLoading");
+export const elTagManagerToolbar = $("tagManagerToolbar");
 export const elTagManagerSort = $("tagManagerSort");
+export const elTagManagerExpandAll = $("tagManagerExpandAll");
 export const elTagManagerList = $("tagManagerList");
 export const elTagManagerEmpty = $("tagManagerEmpty");
 export const elTagManagerBackBtn = $("tagManagerBackBtn");
