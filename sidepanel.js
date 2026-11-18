@@ -5,7 +5,7 @@
  *   storage.js       chrome.storage.local: settings, records, cached suggestions
  *   sheet-sync.js    Apps Script Web App (Google Sheet) sync
  *   claude.js        Claude API status suggestion
- *   tags.js          tag colors, counts, autocomplete list
+ *   tags.js          tag colors, counts, autocomplete (recent order + filter)
  *   dom.js           element references + shared view helpers
  *   profile-view.js  the profile form (tags, note, status, save, suggest)
  *   browse-view.js   browse-by-tag view

@@ -15,6 +15,7 @@ import {
   elSuggestionChip,
   elSuggestionRationale,
   elSyncStatus,
+  elTagList,
   elTagSuggestions,
   elTagsInput,
   flashSavedConfirm,
@@ -33,7 +34,7 @@ import {
 } from "./storage.js";
 import { fetchAllRecords, fetchRemote, pushRemote } from "./sheet-sync.js";
 import { callClaudeSuggestion, extractVisibleProfileText } from "./claude.js";
-import { getKnownTags, mergeKnownTags, setKnownTagsFromRecords, tagColorClass } from "./tags.js";
+import { filterTags, getKnownTags, markTagsUsed, setKnownTagsFromRecords, tagColorClass } from "./tags.js";
 
 /* ---------- State ---------- */
 
@@ -97,7 +98,7 @@ function addTag(raw) {
     }
   }
   renderChips();
-  mergeKnownTags(currentTags);
+  markTagsUsed(parts);
   renderTagSuggestions();
 }
 
@@ -108,32 +109,110 @@ export async function refreshKnownTags() {
   setKnownTagsFromRecords(records);
 }
 
-function renderTagSuggestions() {
-  const query = elTagsInput.value.trim().toLowerCase();
-  const applied = new Set(currentTags.map((t) => t.toLowerCase()));
-  const matches = getKnownTags()
-    .filter((t) => !applied.has(t.toLowerCase()) && (query === "" || t.toLowerCase().includes(query)))
-    .slice(0, 8);
+const SUGGESTION_LIMIT = 8;
+let allTagsOpen = false; // the full, scrollable "All tags" list is showing instead of the top suggestions
 
+// Picking a tag from the suggestions or the All tags list. Runs on mousedown
+// (not click) with preventDefault, so the input never blurs — its blur
+// handler would otherwise commit half-typed text and close the list first.
+function pickTagOnMousedown(btn, tag) {
+  btn.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    addTag(tag);
+    elTagsInput.value = "";
+    renderTagSuggestions();
+    elTagsInput.focus();
+  });
+}
+
+function openAllTags() {
+  allTagsOpen = true;
+  renderTagSuggestions();
+}
+
+function closeAllTags() {
+  allTagsOpen = false;
+  renderTagSuggestions();
+}
+
+function hideTagMenus() {
+  allTagsOpen = false;
+  elTagSuggestions.hidden = true;
+  elTagList.hidden = true;
+}
+
+function renderTagSuggestions() {
+  const matches = filterTags(getKnownTags(), currentTags, elTagsInput.value);
+  if (allTagsOpen) renderAllTagsList(matches);
+  else renderTopSuggestions(matches);
+}
+
+function renderTopSuggestions(matches) {
+  elTagList.hidden = true;
   elTagSuggestions.innerHTML = "";
   elTagSuggestions.hidden = matches.length === 0;
 
-  for (const tag of matches) {
+  for (const tag of matches.slice(0, SUGGESTION_LIMIT)) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "tag-suggestion";
     btn.textContent = tag;
-    // mousedown (not click) fires before the input's blur, so the tag is
-    // added before addTag()'s own blur handler would otherwise fire first.
-    btn.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      addTag(tag);
-      elTagsInput.value = "";
-      renderTagSuggestions();
-      elTagsInput.focus();
-    });
+    pickTagOnMousedown(btn, tag);
     elTagSuggestions.appendChild(btn);
   }
+
+  if (matches.length > SUGGESTION_LIMIT) {
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "tag-suggestion tag-suggestion-all";
+    more.textContent = `All tags (${matches.length})`;
+    more.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      openAllTags();
+    });
+    elTagSuggestions.appendChild(more);
+  }
+}
+
+function renderAllTagsList(matches) {
+  elTagSuggestions.hidden = true;
+  elTagList.hidden = false;
+  elTagList.innerHTML = "";
+
+  const head = document.createElement("div");
+  head.className = "tag-list-head";
+  const title = document.createElement("span");
+  title.className = "tag-list-title";
+  title.textContent = elTagsInput.value.trim() ? `Matching tags (${matches.length})` : `All tags (${matches.length})`;
+  const done = document.createElement("button");
+  done.type = "button";
+  done.className = "tag-list-done";
+  done.textContent = "Done";
+  done.addEventListener("click", closeAllTags);
+  head.append(title, done);
+  elTagList.appendChild(head);
+
+  const items = document.createElement("div");
+  items.className = "tag-list-items";
+  if (matches.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "tag-list-empty";
+    empty.textContent = "No matching tags — press Enter to add it as a new tag.";
+    items.appendChild(empty);
+  }
+  for (const tag of [...matches].sort((a, b) => a.localeCompare(b))) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tag-list-item";
+    const dot = document.createElement("span");
+    dot.className = `tag-list-dot ${tagColorClass(tag)}`;
+    const label = document.createElement("span");
+    label.textContent = tag;
+    btn.append(dot, label);
+    pickTagOnMousedown(btn, tag);
+    items.appendChild(btn);
+  }
+  elTagList.appendChild(items);
 }
 
 /* ---------- Status ---------- */
@@ -437,7 +516,7 @@ export function initProfileView() {
       renderChips();
       renderTagSuggestions();
     } else if (e.key === "Escape") {
-      elTagSuggestions.hidden = true;
+      hideTagMenus();
     }
   });
 
@@ -450,8 +529,12 @@ export function initProfileView() {
       addTag(elTagsInput.value);
       elTagsInput.value = "";
     }
-    elTagSuggestions.hidden = true;
+    hideTagMenus();
   });
+
+  // Clicks on the list's padding, header or scrollbar must not blur the input
+  // (that would close the list). "Done" still gets its click.
+  elTagList.addEventListener("mousedown", (e) => e.preventDefault());
 
   elSaveBtn.addEventListener("click", saveCurrentProfile);
 
