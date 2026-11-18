@@ -169,7 +169,7 @@ function markDirty() {
 /* ---------- Remote sync (Apps Script Web App) ---------- */
 /*
  * Requests use text/plain bodies and no custom headers so they stay
- * "simple requests" and never trigger a CORS preflight â€” Apps Script
+ * "simple requests" and never trigger a CORS preflight — Apps Script
  * web apps cannot handle OPTIONS preflight requests.
  */
 
@@ -241,6 +241,9 @@ function renderChips() {
     remove.className = "chip-remove";
     remove.setAttribute("aria-label", `Remove tag ${tag}`);
     remove.textContent = "×";
+    // Without this, clicking "×" while typing blurs the input first; the blur
+    // handler re-renders the chips, the button vanishes and the click is lost.
+    remove.addEventListener("mousedown", (e) => e.preventDefault());
     remove.addEventListener("click", () => {
       currentTags.splice(index, 1);
       markDirty();
@@ -381,8 +384,30 @@ function applyRecordToForm(record) {
   formDirty = false;
 }
 
+// Unsaved edits per profile, kept while the panel is open, so switching to
+// another tab (or profile) and back doesn't throw them away.
+const drafts = new Map(); // profileUrl -> { tags, note, status }
+
+function stashDraft() {
+  if (currentProfileUrl && formDirty) {
+    drafts.set(currentProfileUrl, { tags: [...currentTags], note: elNoteInput.value, status: currentStatus });
+  }
+}
+
+function restoreDraft(url) {
+  const draft = drafts.get(url);
+  if (!draft) return false;
+  currentTags = [...draft.tags];
+  renderChips();
+  elNoteInput.value = draft.note;
+  setStatus(draft.status);
+  formDirty = true; // still unsaved — and keeps remote data from overwriting it
+  return true;
+}
+
 async function loadProfile(url, name) {
   const myToken = ++loadToken;
+  stashDraft();
   currentProfileUrl = url;
   setCurrentName(name);
 
@@ -393,6 +418,7 @@ async function loadProfile(url, name) {
   const cached = await getLocalRecord(url);
   if (myToken !== loadToken) return;
   applyRecordToForm(cached);
+  const hasDraft = restoreDraft(url);
   // The tab title can be empty or stale; fall back to the name we already know.
   if (!currentName && cached?.name) setCurrentName(cached.name);
 
@@ -403,9 +429,11 @@ async function loadProfile(url, name) {
   if (cachedSuggestion) renderSuggestion(cachedSuggestion.status, cachedSuggestion.rationale);
 
   if (!webAppUrl || !token) {
-    elSyncStatus.textContent = cached?.pendingSync
-      ? "Saved locally — add your Sheet URL in Settings to sync."
-      : "Not synced — add your Sheet URL in Settings.";
+    elSyncStatus.textContent = hasDraft
+      ? "Unsaved changes restored — click Save to keep them."
+      : cached?.pendingSync
+        ? "Saved locally — add your Sheet URL in Settings to sync."
+        : "Not synced — add your Sheet URL in Settings.";
     return;
   }
 
@@ -433,13 +461,18 @@ async function loadProfile(url, name) {
   } catch (err) {
     if (myToken !== loadToken) return;
     elSyncStatus.textContent = "Sync unavailable — showing your local copy.";
+  } finally {
+    if (hasDraft && myToken === loadToken) elSyncStatus.textContent = "Unsaved changes restored — click Save to keep them.";
   }
 }
 
 function loadEmpty() {
   ++loadToken; // invalidate any in-flight profile fetch
+  stashDraft();
   currentProfileUrl = null;
   currentTags = [];
+  pendingSuggestion = null;
+  formDirty = false;
   showView("empty");
 }
 
@@ -532,6 +565,7 @@ elSaveBtn.addEventListener("click", async () => {
   };
 
   formDirty = false;
+  drafts.delete(record.profileUrl);
   await setLocalRecord(record);
   flashSavedConfirm(elSavedConfirm);
 
@@ -585,14 +619,21 @@ async function callClaudeSuggestion(apiKey, { name, note, pageText }) {
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
       "anthropic-dangerous-direct-browser-access": "true",
+      // Server-side fallback: if a safety classifier declines, the API
+      // re-runs the request on a recommended fallback model in the same call.
+      "anthropic-beta": "server-side-fallback-2026-07-01",
     },
     body: JSON.stringify({
-      model: "claude-opus-4-8",
-      max_tokens: 300,
+      model: "claude-opus-5-5",
+      // Opus 5.5 always thinks, and thinking counts toward max_tokens — a
+      // small cap (it was 300) cut the JSON off mid-answer.
+      max_tokens: 16000,
+      fallbacks: "default",
       system:
         'You help someone decide whether to keep, reconsider, or remove a LinkedIn connection, based on limited context. If there is not enough information to judge, choose "Unsure" and say why in your rationale.',
       messages: [{ role: "user", content: userContent }],
       output_config: {
+        effort: "low", // a short classification — no need for deep reasoning
         format: {
           type: "json_schema",
           schema: {
@@ -612,10 +653,15 @@ async function callClaudeSuggestion(apiKey, { name, note, pageText }) {
   const json = await res.json();
   if (!res.ok) throw new Error(json.error?.message || `Claude API ${res.status}`);
   if (json.stop_reason === "refusal") throw new Error("Claude declined to answer");
+  if (json.stop_reason === "max_tokens") throw new Error("Claude's answer was cut off — try again");
 
   const textBlock = json.content?.find((b) => b.type === "text");
   if (!textBlock) throw new Error("No response text from Claude");
-  return JSON.parse(textBlock.text);
+  try {
+    return JSON.parse(textBlock.text);
+  } catch {
+    throw new Error("Claude returned an unreadable answer — try again");
+  }
 }
 
 function renderSuggestion(status, rationale) {
@@ -709,8 +755,15 @@ elSaveSettingsBtn.addEventListener("click", async () => {
   const claudeApiKey = elClaudeApiKey.value.trim();
   await saveSettingsToStorage({ webAppUrl, token, claudeApiKey });
   flashSavedConfirm(elSettingsSavedConfirm);
-  elSuggestStatusBtn.hidden = !claudeApiKey;
+  applySuggestAvailability(Boolean(claudeApiKey));
 });
+
+// Show "Suggest" only when a Claude API key is set — on startup too, not
+// just after saving settings — and keep the empty-status hint consistent.
+function applySuggestAvailability(hasKey) {
+  elSuggestStatusBtn.hidden = !hasKey;
+  elStatusEmptyHint.textContent = hasKey ? "No status yet — click Suggest." : "No status yet.";
+}
 
 /* ---------- Event wiring: browse view ---------- */
 
@@ -720,6 +773,21 @@ async function getAllLocalRecords() {
     .filter((key) => key.startsWith("profile:"))
     .map((key) => all[key])
     .filter((record) => record && record.profileUrl);
+}
+
+// Saves that never reached the Sheet (pendingSync) exist only locally, or are
+// newer than their Sheet row — show the local version so Browse isn't missing them.
+function mergeWithLocal(remoteRecords, localRecords) {
+  const byUrl = new Map();
+  for (const r of remoteRecords) {
+    const key = extractProfileUrl(r.profileUrl) || r.profileUrl;
+    byUrl.set(key, r);
+  }
+  for (const local of localRecords) {
+    if (!local.pendingSync) continue;
+    byUrl.set(extractProfileUrl(local.profileUrl) || local.profileUrl, local);
+  }
+  return [...byUrl.values()];
 }
 
 async function fetchAllRecords() {
@@ -733,7 +801,7 @@ async function fetchAllRecords() {
       if (!res.ok) throw new Error(`GET ${res.status}`);
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Unknown error");
-      return { records: json.records || [], source: "remote" };
+      return { records: mergeWithLocal(json.records || [], await getAllLocalRecords()), source: "remote" };
     } catch (err) {
       // fall through to local cache below
     }
@@ -903,6 +971,8 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
 
 (async function init() {
   await loadTagColorOverrides(); // avoids a color flicker on first render
+  const { claudeApiKey } = await getSettings();
+  applySuggestAvailability(Boolean(claudeApiKey));
   refreshForActiveTab();
   refreshKnownTags();
 })();
