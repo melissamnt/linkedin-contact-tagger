@@ -571,13 +571,22 @@ main {
   background: var(--bg);
 }
 
+/* Selected rows get a soft wash of the tag's color (tag-tint-N sets --tint),
+   so the text stays easy to read; the dot and check carry the full color. */
+.tag-tint-0 { --tint: var(--tag-0-bg); --tint-ink: var(--tag-0-text); }
+.tag-tint-1 { --tint: var(--tag-1-bg); --tint-ink: var(--tag-1-text); }
+.tag-tint-2 { --tint: var(--tag-2-bg); --tint-ink: var(--tag-2-text); }
+.tag-tint-3 { --tint: var(--tag-3-bg); --tint-ink: var(--tag-3-text); }
+.tag-tint-4 { --tint: var(--tag-4-bg); --tint-ink: var(--tag-4-text); }
+.tag-tint-5 { --tint: var(--tag-5-bg); --tint-ink: var(--tag-5-text); }
+
 .tag-list-item.is-selected {
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
   font-weight: 600;
 }
 
-/* Selected rows take the tag's own chip color (tag-color-N); keep it on hover. */
 .tag-list-item.is-selected:hover {
-  filter: brightness(0.96);
+  background: color-mix(in srgb, var(--tint) 22%, transparent);
 }
 
 .tag-list-check {
@@ -594,7 +603,9 @@ main {
 }
 
 .tag-list-item.is-selected .tag-list-check {
-  border-color: currentColor;
+  background: var(--tint);
+  border-color: var(--tint);
+  color: var(--tint-ink);
 }
 
 .tag-list-dot {
