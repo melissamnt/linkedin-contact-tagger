@@ -70,7 +70,15 @@ function extractProfileUrl(rawUrl) {
   if (!/(^|\.)linkedin\.com$/.test(parsed.hostname)) return null;
   const match = parsed.pathname.match(/^\/in\/([^/?#]+)\/?/);
   if (!match) return null;
-  return `https://www.linkedin.com/in/${match[1]}/`;
+  // Canonical form: decoded, lowercased, re-encoded — so "/in/Juan-Perez" and
+  // "/in/juan-perez" (or "mar%C3%ADa" vs "maría") map to the same record.
+  let slug;
+  try {
+    slug = encodeURIComponent(decodeURIComponent(match[1]).toLowerCase());
+  } catch {
+    slug = match[1].toLowerCase(); // malformed escape — don't double-encode it
+  }
+  return `https://www.linkedin.com/in/${slug}/`;
 }
 
 function extractNameFromTitle(title) {
@@ -124,7 +132,21 @@ async function saveSettingsToStorage(settings) {
 
 async function getLocalRecord(url) {
   const data = await chrome.storage.local.get(profileKey(url));
-  return data[profileKey(url)] || null;
+  if (data[profileKey(url)]) return data[profileKey(url)];
+
+  // Records saved before URLs were canonicalized may sit under a
+  // differently-cased/encoded key — find one and move it to the new key.
+  const all = await chrome.storage.local.get(null);
+  for (const [key, record] of Object.entries(all)) {
+    if (!key.startsWith("profile:") || !record?.profileUrl) continue;
+    if (extractProfileUrl(record.profileUrl) === url) {
+      const migrated = { ...record, profileUrl: url };
+      await chrome.storage.local.remove(key);
+      await setLocalRecord(migrated);
+      return migrated;
+    }
+  }
+  return null;
 }
 
 async function setLocalRecord(record) {
@@ -232,12 +254,16 @@ function renderChips() {
 }
 
 function addTag(raw) {
-  const tag = raw.trim().replace(/,+$/, "").trim();
-  if (!tag) return;
-  const exists = currentTags.some((t) => t.toLowerCase() === tag.toLowerCase());
-  if (!exists) {
-    currentTags.push(tag);
-    markDirty();
+  // The Sheet stores tags comma-separated, so a comma can never live inside
+  // a tag — split pasted input like "SF, Tech" into separate tags up front.
+  const parts = raw.split(",").map((t) => t.trim()).filter(Boolean);
+  if (!parts.length) return;
+  for (const tag of parts) {
+    const exists = currentTags.some((t) => t.toLowerCase() === tag.toLowerCase());
+    if (!exists) {
+      currentTags.push(tag);
+      markDirty();
+    }
   }
   renderChips();
   mergeKnownTags(currentTags);
@@ -341,6 +367,11 @@ function flashSavedConfirm(el) {
 
 /* ---------- Loading a profile into the form ---------- */
 
+function setCurrentName(name) {
+  currentName = name || "";
+  elProfileName.textContent = currentName || "—";
+}
+
 function applyRecordToForm(record) {
   currentTags = record?.tags ? [...record.tags] : [];
   renderChips();
@@ -353,9 +384,8 @@ function applyRecordToForm(record) {
 async function loadProfile(url, name) {
   const myToken = ++loadToken;
   currentProfileUrl = url;
-  currentName = name || "";
+  setCurrentName(name);
 
-  elProfileName.textContent = currentName || "—";
   elProfileUrl.textContent = url.replace(/^https:\/\//, "");
   elProfileUrl.href = url;
 
@@ -363,6 +393,8 @@ async function loadProfile(url, name) {
   const cached = await getLocalRecord(url);
   if (myToken !== loadToken) return;
   applyRecordToForm(cached);
+  // The tab title can be empty or stale; fall back to the name we already know.
+  if (!currentName && cached?.name) setCurrentName(cached.name);
 
   const { webAppUrl, token } = await getSettings();
 
@@ -394,7 +426,8 @@ async function loadProfile(url, name) {
     // Don't clobber edits the user started while the fetch was in flight.
     if (record && !formDirty) {
       applyRecordToForm(record);
-      await setLocalRecord({ ...record, profileUrl: url, name: name || record.name, pendingSync: false });
+      if (!currentName && record.name) setCurrentName(record.name);
+      await setLocalRecord({ ...record, profileUrl: url, name: currentName || record.name, pendingSync: false });
     }
     elSyncStatus.textContent = "Synced";
   } catch (err) {
@@ -432,13 +465,15 @@ async function refreshForActiveTab() {
       // Reloading here would wipe unsaved edits, so only refresh the name
       // (LinkedIn often updates the title after the URL on SPA navigation).
       const freshName = extractNameFromTitle(tab.title);
-      if (freshName && freshName !== currentName) {
-        currentName = freshName;
-        elProfileName.textContent = freshName;
-      }
+      if (freshName && freshName !== currentName) setCurrentName(freshName);
       return;
     }
-    await loadProfile(url, extractNameFromTitle(tab.title));
+    let titleName = extractNameFromTitle(tab.title);
+    // On SPA navigation the URL changes before the title, so the title may
+    // still be the previous profile's name. Ignore it; the title-change event
+    // that follows (handled above) fills in the right one.
+    if (titleName === currentName) titleName = "";
+    await loadProfile(url, titleName);
   } else {
     viewBeforeOverlay = "empty";
     loadEmpty();
