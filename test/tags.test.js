@@ -5,6 +5,7 @@ import {
   TAG_COLOR_COUNT,
   collectRecentTags,
   collectTagCounts,
+  filterRecordsByTags,
   filterTags,
   getKnownTags,
   listAllTags,
@@ -152,4 +153,18 @@ test("sortTagCounts: most used (ties A–Z), A–Z and Z–A ignoring capitals",
   assert.deepEqual(labels("az"), ["Art", "design", "SF", "tech"]);
   assert.deepEqual(labels("za"), ["tech", "SF", "design", "Art"]);
   assert.deepEqual(counts.map((t) => t.label), ["tech", "Art", "SF", "design"], "input not mutated");
+});
+
+test("filterRecordsByTags: All shows everyone; otherwise anyone with a checked tag", () => {
+  const records = [
+    { name: "A", tags: ["SF", "Tech"] },
+    { name: "B", tags: ["design"] },
+    { name: "C", tags: [] },
+    { name: "D" },
+  ];
+  const names = (all, sel) => filterRecordsByTags(records, all, new Set(sel)).map((r) => r.name);
+  assert.deepEqual(names(true, []), ["A", "B", "C", "D"]);
+  assert.deepEqual(names(false, ["tech", "design"]), ["A", "B"]); // untagged hidden once All is off
+  assert.deepEqual(names(false, ["design"]), ["B"]);
+  assert.deepEqual(names(false, []), []);
 });

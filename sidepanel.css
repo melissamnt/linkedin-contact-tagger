@@ -857,40 +857,14 @@ main {
 
 /* ---------- Browse view ---------- */
 
-.tag-cloud {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+/* ---------- Browse people filter ---------- */
+
+.browse-filter {
   margin-bottom: 22px;
-}
-
-.tag-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 8px 7px 14px;
-  border: none;
-  border-radius: var(--radius-pill);
-  font-family: var(--font-display);
-  font-size: 12.5px;
-  font-weight: 700;
-  box-shadow: var(--shadow-sm);
-  opacity: 0.82;
-  transition: opacity var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
-}
-
-.tag-chip-select {
-  padding: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  white-space: nowrap;
-}
-
-/* Browse chips are a single filter button now. */
-.tag-chip-plain {
-  padding: 7px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 /* ---------- Tag manager ---------- */
@@ -1027,43 +1001,6 @@ main {
 
 .tag-editor-actions .link-btn {
   margin-top: 0;
-}
-
-.tag-chip:hover {
-  opacity: 1;
-  transform: scale(1.02);
-}
-
-.tag-chip:focus-visible {
-  outline: 2px solid var(--accent-ring);
-  outline-offset: 2px;
-}
-
-.tag-chip.is-active {
-  opacity: 1;
-  box-shadow: 0 0 0 3px var(--accent-ring), var(--shadow-sm);
-}
-
-.tag-chip-all {
-  padding: 7px 14px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  color: var(--ink-muted);
-  box-shadow: none;
-  opacity: 1;
-}
-
-.tag-chip-all:hover {
-  border-color: var(--border-strong);
-  color: var(--ink);
-  transform: none;
-}
-
-.tag-chip-all.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
-  box-shadow: var(--shadow-sm);
 }
 
 .browse-list {

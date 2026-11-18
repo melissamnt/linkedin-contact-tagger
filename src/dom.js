@@ -38,9 +38,9 @@ export const elClaudeApiKey = $("claudeApiKey");
 export const elSaveSettingsBtn = $("saveSettingsBtn");
 export const elSettingsSavedConfirm = $("settingsSavedConfirm");
 
-// Browse people by tag
+// Browse people
 export const elBrowseToggle = $("browseToggle");
-export const elTagCloud = $("tagCloud");
+export const elBrowseFilter = $("browseFilter");
 export const elBrowseList = $("browseList");
 export const elBrowseEmpty = $("browseEmpty");
 export const elBrowseBackBtn = $("browseBackBtn");

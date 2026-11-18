@@ -88,6 +88,13 @@ export function collectTagCounts(records) {
   return [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
+// Browse people filter: everyone while "All" is checked; otherwise people
+// carrying at least one checked tag (`selected` holds lowercase tags).
+export function filterRecordsByTags(records, allSelected, selected) {
+  if (allSelected) return records;
+  return records.filter((r) => (r.tags || []).some((t) => selected.has(t.toLowerCase())));
+}
+
 // Order for the Tag manager: "count" (most used first, then A–Z), "az" or "za".
 export function sortTagCounts(counts, mode) {
   const byName = (a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
