@@ -20,7 +20,18 @@ See [DEPLOY.md](DEPLOY.md) for the full walkthrough: deploying the Google Sheet 
 ```
 manifest.json        Extension manifest (MV3)
 background.js         Service worker (opens the side panel)
-sidepanel.html/css/js Side panel UI and logic
+sidepanel.html/css    Side panel markup and styles
+sidepanel.js          Side panel entry point (ES module: wires views + tab listeners)
+src/                  Side panel modules
+  profile-url.js        URL canonicalization, name from tab title (pure)
+  storage.js            chrome.storage.local: settings, records, cached suggestions
+  sheet-sync.js         Apps Script Web App sync
+  claude.js             Claude API status suggestion
+  tags.js               Tag colors, counts, autocomplete list
+  dom.js                Element references + shared view helpers
+  profile-view.js       Profile form: tags, note, status, save, suggest
+  browse-view.js        Browse-by-tag view
+  settings-view.js      Settings view
 apps-script/Code.gs    Google Apps Script backend (doGet/doPost)
 fonts/, icons/         Bundled assets (no external font/CDN requests)
 ```
