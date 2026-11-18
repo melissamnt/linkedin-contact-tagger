@@ -34,7 +34,15 @@ import {
 } from "./storage.js";
 import { fetchAllRecords, fetchRemote, pushRemote } from "./sheet-sync.js";
 import { callClaudeSuggestion, extractVisibleProfileText } from "./claude.js";
-import { filterTags, getKnownTags, listAllTags, markTagsUsed, setKnownTagsFromRecords, tagColorClass } from "./tags.js";
+import {
+  filterTags,
+  getKnownTags,
+  listAllTags,
+  markTagsUsed,
+  renameTagInList,
+  setKnownTagsFromRecords,
+  tagColorClass,
+} from "./tags.js";
 
 /* ---------- State ---------- */
 
@@ -104,6 +112,16 @@ function addTag(raw) {
   }
   renderChips();
   markTagsUsed(parts);
+  renderTagSuggestions();
+}
+
+// A tag was renamed (or recolored) in Browse: update the open contact and any
+// unsaved drafts so they don't keep — or later re-save — the old name.
+// Doesn't mark the form dirty: the rename is already saved everywhere.
+export function applyTagRename(from, to) {
+  currentTags = renameTagInList(currentTags, from, to);
+  for (const draft of drafts.values()) draft.tags = renameTagInList(draft.tags, from, to);
+  renderChips();
   renderTagSuggestions();
 }
 

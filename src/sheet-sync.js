@@ -41,6 +41,28 @@ export async function pushRemote(record) {
   return { configured: true };
 }
 
+// Renames a tag on every Sheet row in one request. A Code.gs deployed before
+// the renameTag action treats the body as a save and answers "Missing profileUrl".
+export async function renameTagRemote(from, to) {
+  const { webAppUrl, token } = await getSettings();
+  if (!webAppUrl || !token) return { configured: false };
+
+  const res = await fetch(webAppUrl, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: "renameTag", from, to, token }),
+  });
+  if (!res.ok) throw new Error(`POST ${res.status}`);
+  const json = await res.json();
+  if (!json.ok) {
+    if (json.error === "Missing profileUrl") {
+      throw new Error("your Apps Script is out of date. Paste the latest Code.gs and re-deploy (see DEPLOY.md)");
+    }
+    throw new Error(json.error || "Unknown error");
+  }
+  return { configured: true, updated: json.updated };
+}
+
 // Saves that never reached the Sheet (pendingSync) exist only locally, or are
 // newer than their Sheet row — show the local version so Browse isn't missing them.
 export function mergeWithLocal(remoteRecords, localRecords) {

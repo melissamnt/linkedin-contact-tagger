@@ -888,7 +888,7 @@ main {
   white-space: nowrap;
 }
 
-.tag-swatch {
+.tag-edit-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -896,24 +896,84 @@ main {
   width: 18px;
   height: 18px;
   padding: 0;
-  border-radius: 50%;
-  border: 1.5px dashed currentColor;
+  border: none;
   background: none;
   color: inherit;
-  font-size: 10px;
-  line-height: 1;
-  opacity: 0.75;
-  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+  opacity: 0.6;
+  transition: opacity var(--dur) var(--ease);
 }
 
-.tag-swatch:hover {
+.tag-edit-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.tag-edit-btn:hover {
   opacity: 1;
-  transform: rotate(40deg);
 }
 
-.tag-swatch:focus-visible {
+.tag-edit-btn:focus-visible {
   outline: 2px solid var(--accent-ring);
   outline-offset: 2px;
+  border-radius: 50%;
+}
+
+/* Rename / recolor a tag, opened from the pencil on its chip. */
+.tag-editor {
+  margin: -8px 0 22px;
+  padding: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.tag-editor[hidden] {
+  display: none;
+}
+
+.tag-editor-color-label {
+  display: block;
+  margin-top: 14px;
+}
+
+.tag-editor-colors {
+  display: flex;
+  gap: 10px;
+}
+
+.tag-editor-color {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+}
+
+.tag-editor-color[aria-checked="true"] {
+  box-shadow: 0 0 0 2px var(--bg-elevated), 0 0 0 4px var(--ink);
+}
+
+.tag-editor-color:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 4px;
+}
+
+.tag-editor-error {
+  min-height: 1em;
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--remove-ink);
+}
+
+.tag-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.tag-editor-actions .link-btn {
+  margin-top: 0;
 }
 
 .tag-chip:hover {

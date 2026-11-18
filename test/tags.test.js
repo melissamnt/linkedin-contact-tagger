@@ -10,10 +10,14 @@ import {
   listAllTags,
   loadTagColorOverrides,
   markTagsUsed,
+  renameKnownTag,
+  renameTagColor,
+  renameTagInList,
   setKnownTagsFromRecords,
   setTagColorOverride,
   tagColorClass,
   tagColorIndex,
+  validateTagName,
 } from "../src/tags.js";
 
 beforeEach(async () => {
@@ -101,4 +105,36 @@ test("listAllTags: every tag A–Z, applied ones flagged, filtered by query", ()
     { tag: "Tech", selected: false },
   ]);
   assert.deepEqual(listAllTags(known, ["Startup"], "STAR"), [{ tag: "Startup", selected: true }]);
+});
+
+test("validateTagName: empty, commas and existing names refused; capitals-only change allowed", () => {
+  const existing = ["Startup", "Tech"];
+  assert.equal(validateTagName("  ", "Tech", existing), "Name can't be empty.");
+  assert.equal(validateTagName("a, b", "Tech", existing), "Tag names can't contain commas.");
+  assert.equal(validateTagName("startup", "Tech", existing), '"startup" already exists.');
+  assert.equal(validateTagName("TECH", "Tech", existing), null);
+  assert.equal(validateTagName(" Fintech ", "Tech", existing), null);
+});
+
+test("renameTagInList: replaces any capitals, no duplicates", () => {
+  assert.deepEqual(renameTagInList(["SF", "start-up"], "Start-Up", "Startup"), ["SF", "Startup"]);
+  assert.deepEqual(renameTagInList(["startup", "Startup"], "startup", "Startup"), ["Startup"]);
+  assert.deepEqual(renameTagInList(["SF"], "Tech", "X"), ["SF"]);
+});
+
+test("renameTagColor: new name keeps the chosen color, old override dropped", async () => {
+  const store = installFakeChrome({ tagColors: { "start-up": 2 } });
+  await loadTagColorOverrides();
+  await renameTagColor("start-up", "Startup", 2);
+  assert.deepEqual(store.tagColors, { startup: 2 });
+  assert.equal(tagColorIndex("Startup"), 2);
+});
+
+test("renameKnownTag: renamed in place in the autocomplete list", () => {
+  setKnownTagsFromRecords([
+    { tags: ["Tech"], updatedAt: "2026-02-01T00:00:00Z" },
+    { tags: ["start-up"], updatedAt: "2026-01-01T00:00:00Z" },
+  ]);
+  renameKnownTag("start-up", "Startup");
+  assert.deepEqual(getKnownTags(), ["Tech", "Startup"]);
 });

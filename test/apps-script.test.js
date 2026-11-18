@@ -155,3 +155,39 @@ test("getSheet: extends an older header row that lacks added_at", () => {
   get(gs, { token: "s3cret", action: "list" });
   assert.deepEqual(sheet.data[0], HEADERS);
 });
+
+test("doPost renameTag: renames on every row, case-insensitively, without touching updated_at", () => {
+  const sheet = makeSheet([
+    HEADERS,
+    ["https://www.linkedin.com/in/a/", "A", "SF, start-up", "", "", "2025-01-01", ""],
+    ["https://www.linkedin.com/in/b/", "B", "Start-Up", "", "", "2025-02-02", ""],
+    ["https://www.linkedin.com/in/c/", "C", "Design", "", "", "2025-03-03", ""],
+  ]);
+  const gs = loadCodeGs(sheet);
+
+  const res = post(gs, { token: "s3cret", action: "renameTag", from: "start-up", to: "Startup" });
+
+  assert.deepEqual(res, { ok: true, updated: 2 });
+  assert.deepEqual(sheet.data.map((r) => r[2]), ["tags", "SF, Startup", "Startup", "Design"]);
+  assert.deepEqual(sheet.data.map((r) => r[5]), ["updated_at", "2025-01-01", "2025-02-02", "2025-03-03"]);
+});
+
+test("doPost renameTag: allows a capitals-only change, refuses an existing name", () => {
+  const sheet = makeSheet([
+    HEADERS,
+    ["https://www.linkedin.com/in/a/", "A", "startup, Tech", "", "", "", ""],
+  ]);
+  const gs = loadCodeGs(sheet);
+
+  assert.deepEqual(post(gs, { token: "s3cret", action: "renameTag", from: "startup", to: "Tech" }), {
+    ok: false,
+    error: 'Tag "Tech" already exists',
+  });
+  assert.equal(sheet.data[1][2], "startup, Tech", "nothing changed");
+
+  assert.equal(post(gs, { token: "s3cret", action: "renameTag", from: "startup", to: "Startup" }).ok, true);
+  assert.equal(sheet.data[1][2], "Startup, Tech");
+
+  assert.equal(post(gs, { token: "s3cret", action: "renameTag", from: "Tech", to: "a, b" }).error, "Tag names can't contain commas");
+  assert.equal(post(gs, { token: "nope", action: "renameTag", from: "Tech", to: "X" }).error, "Unauthorized");
+});

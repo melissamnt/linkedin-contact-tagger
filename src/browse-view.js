@@ -1,19 +1,27 @@
-/* Browse view: every saved connection, filterable by tag. */
+/* Browse view: every saved connection, filterable by tag; tags can be renamed and recolored here. */
 
-import { elBrowseToggle, elTagCloud, elBrowseList, elBrowseEmpty, showView } from "./dom.js";
-import { fetchAllRecords } from "./sheet-sync.js";
+import { elBrowseToggle, elTagCloud, elTagEditor, elBrowseList, elBrowseEmpty, showView } from "./dom.js";
+import { fetchAllRecords, renameTagRemote } from "./sheet-sync.js";
+import { renameTagInLocalRecords } from "./storage.js";
+import { applyTagRename } from "./profile-view.js";
 import {
   TAG_COLOR_COUNT,
   collectTagCounts,
+  getKnownTags,
+  renameKnownTag,
+  renameTagColor,
+  renameTagInList,
   setKnownTagsFromRecords,
   setTagColorOverride,
   tagColorClass,
   tagColorIndex,
   tagStripeClass,
+  validateTagName,
 } from "./tags.js";
 
 let browseRecords = [];
 let browseSelectedTag = null; // null means "All"
+let editingTag = null; // label of the tag open in the editor, or null
 
 function formatDate(iso) {
   const d = new Date(iso);
@@ -53,23 +61,143 @@ function renderTagCloud() {
     });
     chip.appendChild(select);
 
-    const swatch = document.createElement("button");
-    swatch.type = "button";
-    swatch.className = "tag-swatch";
-    swatch.textContent = "↻";
-    swatch.title = "Change color";
-    swatch.setAttribute("aria-label", `Change color for ${label}`);
-    swatch.addEventListener("click", async (e) => {
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "tag-edit-btn";
+    edit.title = "Edit tag";
+    edit.setAttribute("aria-label", `Edit tag ${label}`);
+    edit.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+    edit.addEventListener("click", (e) => {
       e.stopPropagation();
-      const next = (tagColorIndex(label) + 1) % TAG_COLOR_COUNT;
-      await setTagColorOverride(label, next);
-      renderTagCloud();
-      renderBrowseList();
+      if (editingTag === label) closeTagEditor(); // pencil again closes it
+      else openTagEditor(label);
     });
-    chip.appendChild(swatch);
+    chip.appendChild(edit);
 
     elTagCloud.appendChild(chip);
   }
+}
+
+/* ---------- Tag editor ---------- */
+
+function closeTagEditor() {
+  editingTag = null;
+  elTagEditor.hidden = true;
+  elTagEditor.innerHTML = "";
+}
+
+function openTagEditor(label) {
+  editingTag = label;
+  let colorIndex = tagColorIndex(label);
+  elTagEditor.hidden = false;
+  elTagEditor.innerHTML = "";
+
+  const nameLabel = document.createElement("label");
+  nameLabel.className = "field-label";
+  nameLabel.htmlFor = "tagEditorName";
+  nameLabel.textContent = "Tag name";
+
+  const input = document.createElement("input");
+  input.id = "tagEditorName";
+  input.className = "text-input";
+  input.type = "text";
+  input.value = label;
+  input.autocomplete = "off";
+  input.spellcheck = false;
+
+  const colorLabel = document.createElement("span");
+  colorLabel.className = "field-label tag-editor-color-label";
+  colorLabel.textContent = "Color";
+
+  const colors = document.createElement("div");
+  colors.className = "tag-editor-colors";
+  colors.setAttribute("role", "radiogroup");
+  colors.setAttribute("aria-label", "Color");
+  const renderColors = () => {
+    colors.innerHTML = "";
+    for (let i = 0; i < TAG_COLOR_COUNT; i++) {
+      const sw = document.createElement("button");
+      sw.type = "button";
+      sw.className = `tag-editor-color tag-color-${i}`;
+      sw.setAttribute("role", "radio");
+      sw.setAttribute("aria-checked", String(i === colorIndex));
+      sw.setAttribute("aria-label", `Color ${i + 1}`);
+      sw.addEventListener("click", () => {
+        colorIndex = i;
+        renderColors();
+      });
+      colors.appendChild(sw);
+    }
+  };
+  renderColors();
+
+  const error = document.createElement("p");
+  error.className = "tag-editor-error";
+  error.setAttribute("aria-live", "polite");
+
+  const actions = document.createElement("div");
+  actions.className = "tag-editor-actions";
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "save-btn";
+  save.textContent = "Save";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "link-btn";
+  cancel.textContent = "Cancel";
+  cancel.addEventListener("click", closeTagEditor);
+  actions.append(save, cancel);
+
+  const submit = async () => {
+    const to = input.value.trim();
+    const existing = [...collectTagCounts(browseRecords).map((t) => t.label), ...getKnownTags()];
+    const problem = validateTagName(to, label, existing);
+    if (problem) {
+      error.textContent = problem;
+      return;
+    }
+    error.textContent = "";
+    save.disabled = true;
+    save.textContent = "Saving…";
+    try {
+      await saveTagEdit(label, to, colorIndex);
+      closeTagEditor();
+      renderTagCloud();
+      renderBrowseList();
+    } catch (err) {
+      error.textContent = `Couldn't rename — ${err.message}`;
+      save.disabled = false;
+      save.textContent = "Save";
+    }
+  };
+  save.addEventListener("click", submit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submit();
+    else if (e.key === "Escape") closeTagEditor();
+  });
+
+  elTagEditor.append(nameLabel, input, colorLabel, colors, error, actions);
+  input.focus();
+  input.select();
+}
+
+// Color-only edits stay on this device. A rename goes to the Sheet first, so
+// a failed request changes nothing; then local copies, the open contact,
+// autocomplete and the color setting follow.
+async function saveTagEdit(from, to, colorIndex) {
+  if (to === from) {
+    await setTagColorOverride(from, colorIndex);
+    applyTagRename(from, from); // re-render chips in the new color
+    return;
+  }
+  await renameTagRemote(from, to);
+  await renameTagInLocalRecords(from, to);
+  await renameTagColor(from, to, colorIndex);
+  renameKnownTag(from, to);
+  applyTagRename(from, to);
+  browseRecords = browseRecords.map((r) => (r.tags ? { ...r, tags: renameTagInList(r.tags, from, to) } : r));
+  if (browseSelectedTag === from.toLowerCase()) browseSelectedTag = to.toLowerCase();
 }
 
 function renderBrowseList() {
@@ -131,6 +259,7 @@ function renderBrowseList() {
 
 async function openBrowse() {
   showView("browse");
+  closeTagEditor();
   elTagCloud.innerHTML = "";
   elBrowseList.innerHTML = "";
   elBrowseEmpty.hidden = true;

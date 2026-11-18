@@ -17,6 +17,14 @@ export async function setTagColorOverride(tag, index) {
   await chrome.storage.local.set({ tagColors: tagColorOverrides });
 }
 
+// A renamed tag keeps the color it had (or the one picked while editing):
+// pin it on the new name and drop the old name's override.
+export async function renameTagColor(from, to, index) {
+  delete tagColorOverrides[from.toLowerCase()];
+  tagColorOverrides[to.toLowerCase()] = index;
+  await chrome.storage.local.set({ tagColors: tagColorOverrides });
+}
+
 export function tagColorIndex(tag) {
   const s = tag.toLowerCase();
   if (s in tagColorOverrides) return tagColorOverrides[s];
@@ -34,6 +42,35 @@ export function tagColorClass(tag) {
 
 export function tagStripeClass(tag) {
   return `tag-stripe-${tagColorIndex(tag)}`;
+}
+
+/* ---------- Renaming ---------- */
+
+// Why `to` can't replace `from`, or null if it can. `existing` is every tag
+// in use. A change of capitals only ("startup" -> "Startup") is allowed.
+export function validateTagName(to, from, existing) {
+  const name = to.trim();
+  if (!name) return "Name can't be empty.";
+  if (name.includes(",")) return "Tag names can't contain commas.";
+  const key = name.toLowerCase();
+  if (key !== from.toLowerCase() && existing.some((t) => t.toLowerCase() === key)) {
+    return `"${name}" already exists.`;
+  }
+  return null;
+}
+
+// `tags` with `from` (any capitals) replaced by `to`, without duplicates.
+export function renameTagInList(tags, from, to) {
+  const fromKey = from.toLowerCase();
+  const out = [];
+  const seen = new Set();
+  for (const tag of tags) {
+    const next = tag.toLowerCase() === fromKey ? to : tag;
+    if (seen.has(next.toLowerCase())) continue;
+    seen.add(next.toLowerCase());
+    out.push(next);
+  }
+  return out;
 }
 
 /* ---------- Counts ---------- */
@@ -121,4 +158,8 @@ export function markTagsUsed(tags) {
     used.push(knownTags.find((t) => t.toLowerCase() === key) || tag);
   }
   knownTags = [...used, ...knownTags.filter((t) => !seen.has(t.toLowerCase()))];
+}
+
+export function renameKnownTag(from, to) {
+  knownTags = renameTagInList(knownTags, from, to);
 }

@@ -40,6 +40,7 @@ export const elSettingsSavedConfirm = $("settingsSavedConfirm");
 // Browse view
 export const elBrowseToggle = $("browseToggle");
 export const elTagCloud = $("tagCloud");
+export const elTagEditor = $("tagEditor");
 export const elBrowseList = $("browseList");
 export const elBrowseEmpty = $("browseEmpty");
 export const elBrowseBackBtn = $("browseBackBtn");

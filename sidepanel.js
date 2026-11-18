@@ -8,7 +8,7 @@
  *   tags.js          tag colors, counts, autocomplete (recent order + filter)
  *   dom.js           element references + shared view helpers
  *   profile-view.js  the profile form (tags, note, status, save, suggest)
- *   browse-view.js   browse-by-tag view
+ *   browse-view.js   browse-by-tag view + tag rename/recolor editor
  *   settings-view.js settings view
  */
 
