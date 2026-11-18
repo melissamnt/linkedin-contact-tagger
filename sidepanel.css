@@ -590,6 +590,23 @@ main {
   color: var(--bg-elevated);
 }
 
+/* Tag families: a family's tags are indented under it. */
+.tag-list-item.is-child {
+  padding-left: 28px;
+}
+
+.tag-list-group {
+  padding: 8px 8px 2px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.tag-family-prefix {
+  color: var(--ink-faint);
+}
+
 .tag-list-dot {
   flex: none;
   width: 10px;

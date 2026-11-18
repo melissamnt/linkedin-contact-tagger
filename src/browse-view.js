@@ -14,7 +14,7 @@ import {
 } from "./dom.js";
 import { fetchAllRecords } from "./sheet-sync.js";
 import { sortRecordsByAdded } from "./records.js";
-import { collectTagCounts, filterRecordsByTags, setKnownTagsFromRecords, tagColorClass } from "./tags.js";
+import { buildTagTree, collectTagCounts, filterRecordsByTags, setKnownTagsFromRecords, tagColorClass, tagLabel } from "./tags.js";
 
 let browseRecords = [];
 // "All" checked = everyone, tagged or not. Unchecking a tag unchecks All too,
@@ -36,15 +36,17 @@ function formatDate(iso) {
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
-function filterRow({ label, count, checked, onToggle, colorTag }) {
+// checked: true | false | "mixed" (a family with only some of its tags checked).
+function filterRow({ label, count, checked, onToggle, colorTag, child = false, title }) {
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = checked ? "tag-list-item is-selected" : "tag-list-item";
+  btn.className = `tag-list-item${checked === true ? " is-selected" : ""}${child ? " is-child" : ""}`;
   btn.setAttribute("aria-pressed", String(checked));
+  if (title) btn.title = title;
   const check = document.createElement("span");
   check.className = "tag-list-check";
   check.setAttribute("aria-hidden", "true");
-  check.textContent = checked ? "✓" : "";
+  check.textContent = checked === true ? "✓" : checked === "mixed" ? "–" : "";
   btn.appendChild(check);
   if (colorTag) {
     const dot = document.createElement("span");
@@ -135,27 +137,45 @@ function renderFilter() {
     })
   );
 
-  for (const { label, count } of tagCounts) {
-    const key = label.toLowerCase();
+  // Turning tags on or off; All follows: off as soon as anything is off,
+  // back on once every tag is checked again.
+  const setChecked = (keys, on) => {
+    for (const key of keys) {
+      if (on) selectedTags.add(key);
+      else selectedTags.delete(key);
+    }
+    allSelected = selectedTags.size === tagCounts.length;
+    rerender();
+  };
+
+  // Families first-class: a family row checks or unchecks all its tags (and
+  // the family's own tag, if used); its tags are listed indented below it.
+  for (const node of buildTagTree(browseRecords)) {
+    const on = node.keys.filter((k) => selectedTags.has(k)).length;
+    const state = on === node.keys.length ? true : on === 0 ? false : "mixed";
     items.appendChild(
       filterRow({
-        label,
-        count,
-        colorTag: label,
-        checked: selectedTags.has(key),
-        onToggle: () => {
-          if (selectedTags.has(key)) {
-            selectedTags.delete(key);
-            allSelected = false;
-          } else {
-            selectedTags.add(key);
-            // checking the last unchecked tag checks All again
-            if (selectedTags.size === tagCounts.length) allSelected = true;
-          }
-          rerender();
-        },
+        label: node.label,
+        count: node.count,
+        colorTag: node.label,
+        checked: state,
+        onToggle: () => setChecked(node.keys, state !== true),
       })
     );
+    for (const child of node.children) {
+      const checked = selectedTags.has(child.key);
+      items.appendChild(
+        filterRow({
+          label: child.label,
+          count: child.count,
+          colorTag: child.tag,
+          checked,
+          child: true,
+          title: child.tag,
+          onToggle: () => setChecked([child.key], !checked),
+        })
+      );
+    }
   }
 
   elBrowseFilter.appendChild(items);
@@ -196,7 +216,8 @@ function renderBrowseList() {
       for (const tag of record.tags) {
         const chip = document.createElement("span");
         chip.className = `browse-tag ${tagColorClass(tag)}`;
-        chip.textContent = tag;
+        chip.textContent = tagLabel(tag); // the family shows through the color
+        chip.title = tag;
         tags.appendChild(chip);
       }
       row.appendChild(tags);

@@ -16,6 +16,7 @@ import {
   TAG_COLOR_COUNT,
   collectTagCounts,
   getKnownTags,
+  normalizeTag,
   renameKnownTag,
   renameTagColor,
   renameTagInList,
@@ -150,7 +151,7 @@ function buildTagEditor(label) {
   actions.append(save, cancel);
 
   const submit = async () => {
-    const to = input.value.trim();
+    const to = normalizeTag(input.value); // "Family > Tag" moves the tag into a family
     const existing = [...collectTagCounts(tmRecords).map((t) => t.label), ...getKnownTags()];
     const problem = validateTagName(to, label, existing);
     if (problem) {
@@ -195,7 +196,7 @@ async function saveTagEdit(from, to, colorIndex) {
   }
   await renameTagRemote(from, to);
   await renameTagInLocalRecords(from, to);
-  await renameTagColor(from, to, colorIndex);
+  await renameTagColor(from, to, colorIndex, colorIndex !== tagColorIndex(from));
   renameKnownTag(from, to);
   applyTagRename(from, to);
   tmRecords = tmRecords.map((r) => (r.tags ? { ...r, tags: renameTagInList(r.tags, from, to) } : r));

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { installFakeChrome } from "./helpers/fakes.js";
 import {
   TAG_COLOR_COUNT,
+  buildTagTree,
   collectRecentTags,
   collectTagCounts,
   filterRecordsByTags,
@@ -11,6 +12,9 @@ import {
   listAllTags,
   loadTagColorOverrides,
   markTagsUsed,
+  matchFamilySpelling,
+  normalizeTag,
+  parseTag,
   renameKnownTag,
   renameTagColor,
   renameTagInList,
@@ -19,6 +23,7 @@ import {
   sortTagCounts,
   tagColorClass,
   tagColorIndex,
+  tagLabel,
   validateTagName,
 } from "../src/tags.js";
 
@@ -167,4 +172,96 @@ test("filterRecordsByTags: All shows everyone; otherwise anyone with a checked t
   assert.deepEqual(names(false, ["tech", "design"]), ["A", "B"]); // untagged hidden once All is off
   assert.deepEqual(names(false, ["design"]), ["B"]);
   assert.deepEqual(names(false, []), []);
+});
+
+/* ---------- Tag families ---------- */
+
+test("parseTag / tagLabel: family and name, or just a name", () => {
+  assert.deepEqual(parseTag("Education > Stanford LEAD"), { family: "Education", name: "Stanford LEAD" });
+  assert.deepEqual(parseTag("SF"), { family: null, name: "SF" });
+  assert.equal(tagLabel("Education > DS4A"), "DS4A");
+  assert.equal(tagLabel("Tech"), "Tech");
+});
+
+test("normalizeTag: tidies typed families into the stored form", () => {
+  assert.equal(normalizeTag("Education>DS4A"), "Education > DS4A");
+  assert.equal(normalizeTag("  Education  >   Uniandes "), "Education > Uniandes");
+  assert.equal(normalizeTag("> DS4A"), "DS4A");
+  assert.equal(normalizeTag("Education >"), "Education");
+  assert.equal(normalizeTag("A > B > C"), "A > B C");
+  assert.equal(normalizeTag("  "), "");
+});
+
+test("family colors: every tag in a family shares the family's color", async () => {
+  const store = installFakeChrome();
+  await loadTagColorOverrides();
+  const family = tagColorIndex("Education");
+  assert.equal(tagColorIndex("Education > Stanford LEAD"), family);
+  assert.equal(tagColorIndex("education > DS4A"), family);
+
+  const next = (family + 1) % TAG_COLOR_COUNT;
+  await setTagColorOverride("Education > DS4A", next); // recoloring a tag recolors its family
+  assert.deepEqual(store.tagColors, { education: next });
+  assert.equal(tagColorIndex("Education > Uniandes"), next);
+  assert.equal(tagColorIndex("Education"), next);
+});
+
+test("renameTagColor: moving into a family adopts its color; leaving one keeps the family's", async () => {
+  const store = installFakeChrome({ tagColors: { education: 4, uniandes: 1 } });
+  await loadTagColorOverrides();
+
+  await renameTagColor("Uniandes", "Education > Uniandes", 1, false); // color untouched in the editor
+  assert.equal(tagColorIndex("Education > Uniandes"), 4);
+  assert.deepEqual(store.tagColors, { education: 4 });
+
+  await renameTagColor("Education > DS4A", "DS4A", 4, false); // leaves the family, keeps its look
+  assert.equal(tagColorIndex("DS4A"), 4);
+  assert.equal(tagColorIndex("Education > Uniandes"), 4, "family color untouched");
+});
+
+test("validateTagName: families allowed, one > at most, duplicates compared normalized", () => {
+  const existing = ["Education > Uniandes", "SF"];
+  assert.equal(validateTagName("Education > DS4A", "DS4A", existing), null);
+  assert.equal(validateTagName("education>uniandes", "Uniandes", existing), '"education > uniandes" already exists.');
+  assert.equal(validateTagName("A > B > C", "SF", existing), 'Use one ">" at most: Family > Tag.');
+  assert.equal(validateTagName(" > ", "SF", existing), "Name can't be empty.");
+});
+
+test("listAllTags: a family's own tag first, then its tags A–Z, grouped with flat tags", () => {
+  const known = ["Education > Uniandes", "SF", "Education", "Education > DS4A", "Design", "Events > Web Summit"];
+  assert.deepEqual(
+    listAllTags(known, [], "").map((r) => r.tag),
+    ["Design", "Education", "Education > DS4A", "Education > Uniandes", "Events > Web Summit", "SF"]
+  );
+  // searching a family name finds its tags
+  assert.deepEqual(listAllTags(known, [], "educ").map((r) => r.tag), ["Education", "Education > DS4A", "Education > Uniandes"]);
+});
+
+test("buildTagTree: families count people once and own their tags; flat tags stand alone", () => {
+  const tree = buildTagTree([
+    { tags: ["Education > Stanford LEAD", "Education > DS4A", "SF"] },
+    { tags: ["Education > DS4A"] },
+    { tags: ["education"] }, // the family used as a tag on its own
+    { tags: ["SF"] },
+  ]);
+  assert.deepEqual(
+    tree.map(({ label, count, keys, children }) => ({ label, count, keys, children: children.map((c) => [c.label, c.count]) })),
+    [
+      {
+        label: "Education",
+        count: 3,
+        keys: ["education > stanford lead", "education > ds4a", "education"],
+        children: [["DS4A", 2], ["Stanford LEAD", 1]],
+      },
+      { label: "SF", count: 2, keys: ["sf"], children: [] },
+    ]
+  );
+});
+
+test("matchFamilySpelling: joins an existing family's spelling", () => {
+  const known = ["Education > Uniandes", "SF"];
+  assert.equal(matchFamilySpelling("education > Harvard", known), "Education > Harvard");
+  assert.equal(matchFamilySpelling("sf > Mission", known), "SF > Mission"); // a flat tag becomes the family
+  assert.equal(matchFamilySpelling("Events > Web Summit", known), "Events > Web Summit");
+  assert.equal(matchFamilySpelling("Tech", known), "Tech");
 });

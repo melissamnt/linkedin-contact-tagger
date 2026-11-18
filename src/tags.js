@@ -1,11 +1,64 @@
-/* Tag colors, tag counts, and the known-tags list used for autocomplete. */
+/* Tag families, colors, counts, and the known-tags list used for autocomplete.
+   A tag can belong to a family by its name: "Education > Stanford LEAD".
+   Two levels only; a family can also be used as a tag on its own. */
 
 export const TAG_COLOR_COUNT = 6;
 
 let tagColorOverrides = {}; // lowercase tag -> palette index; loaded once, kept in sync with storage
 let knownTags = []; // every tag seen across saved connections, for autocomplete
 
+/* ---------- Families ---------- */
+
+export const FAMILY_SEPARATOR = " > ";
+
+// { family, name } for a tag: "Education > DS4A" -> { family: "Education", name: "DS4A" };
+// a tag without a family -> { family: null, name: tag }.
+export function parseTag(tag) {
+  const i = tag.indexOf(">");
+  if (i === -1) return { family: null, name: tag.trim() };
+  return { family: tag.slice(0, i).trim(), name: tag.slice(i + 1).trim() };
+}
+
+// Tidies typed input into the stored form: "education>ds4a " -> "education > ds4a".
+// Empty sides collapse ("> DS4A" -> "DS4A", "Education >" -> "Education"); a
+// deeper path keeps two levels by joining the rest ("A > B > C" -> "A > B C").
+export function normalizeTag(raw) {
+  const parts = raw.split(">").map((p) => p.trim()).filter(Boolean);
+  if (parts.length <= 1) return parts[0] || "";
+  return `${parts[0]}${FAMILY_SEPARATOR}${parts.slice(1).join(" ")}`;
+}
+
+// Reuses the family spelling already in `known`, so typing "education > Harvard"
+// joins the existing "Education" family instead of starting "education".
+export function matchFamilySpelling(tag, known) {
+  const { family, name } = parseTag(tag);
+  if (!family) return tag;
+  const key = family.toLowerCase();
+  for (const k of known) {
+    const p = parseTag(k);
+    const existing = p.family || p.name;
+    if (existing.toLowerCase() === key) return `${existing}${FAMILY_SEPARATOR}${name}`;
+  }
+  return tag;
+}
+
+// What a chip shows: the tag's own name; the family comes through its color.
+export function tagLabel(tag) {
+  return parseTag(tag).name;
+}
+
+export function tagFamily(tag) {
+  return parseTag(tag).family;
+}
+
 /* ---------- Colors ---------- */
+
+// Colors belong to the family: "Education", "Education > DS4A" and
+// "Education > Uniandes" all share the "education" color.
+function colorKey(tag) {
+  const { family, name } = parseTag(tag);
+  return (family || name).toLowerCase();
+}
 
 export async function loadTagColorOverrides() {
   const { tagColors } = await chrome.storage.local.get("tagColors");
@@ -13,20 +66,24 @@ export async function loadTagColorOverrides() {
 }
 
 export async function setTagColorOverride(tag, index) {
-  tagColorOverrides[tag.toLowerCase()] = index;
+  tagColorOverrides[colorKey(tag)] = index;
   await chrome.storage.local.set({ tagColors: tagColorOverrides });
 }
 
-// A renamed tag keeps the color it had (or the one picked while editing):
-// pin it on the new name and drop the old name's override.
-export async function renameTagColor(from, to, index) {
-  delete tagColorOverrides[from.toLowerCase()];
-  tagColorOverrides[to.toLowerCase()] = index;
+// After a rename. A tag without a family keeps the color it had (or the one
+// picked while editing) under its new name. A tag moving into a family takes
+// that family's color unless a new color was picked; leaving a family never
+// changes the family's color for the tags still in it.
+export async function renameTagColor(from, to, index, colorChanged = true) {
+  const fromKey = colorKey(from);
+  const toKey = colorKey(to);
+  if (fromKey !== toKey && !tagFamily(from)) delete tagColorOverrides[fromKey];
+  if (fromKey === toKey || colorChanged || !tagFamily(to)) tagColorOverrides[toKey] = index;
   await chrome.storage.local.set({ tagColors: tagColorOverrides });
 }
 
 export function tagColorIndex(tag) {
-  const s = tag.toLowerCase();
+  const s = colorKey(tag);
   if (s in tagColorOverrides) return tagColorOverrides[s];
 
   let hash = 0;
@@ -45,11 +102,12 @@ export function tagColorClass(tag) {
 // Why `to` can't replace `from`, or null if it can. `existing` is every tag
 // in use. A change of capitals only ("startup" -> "Startup") is allowed.
 export function validateTagName(to, from, existing) {
-  const name = to.trim();
+  if ((to.match(/>/g) || []).length > 1) return "Use one \">\" at most: Family > Tag.";
+  const name = normalizeTag(to);
   if (!name) return "Name can't be empty.";
   if (name.includes(",")) return "Tag names can't contain commas.";
   const key = name.toLowerCase();
-  if (key !== from.toLowerCase() && existing.some((t) => t.toLowerCase() === key)) {
+  if (key !== normalizeTag(from).toLowerCase() && existing.some((t) => normalizeTag(t).toLowerCase() === key)) {
     return `"${name}" already exists.`;
   }
   return null;
@@ -82,6 +140,62 @@ export function collectTagCounts(records) {
     }
   }
   return [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+// Groups a family with its tags: by family (or the tag itself), then the
+// family's own tag first, then its tags A–Z.
+function familyGroupCompare(a, b) {
+  const pa = parseTag(a);
+  const pb = parseTag(b);
+  const ga = pa.family || pa.name;
+  const gb = pb.family || pb.name;
+  const byGroup = ga.localeCompare(gb, undefined, { sensitivity: "base" });
+  if (byGroup) return byGroup;
+  if (!pa.family !== !pb.family) return pa.family ? 1 : -1;
+  return pa.name.localeCompare(pb.name, undefined, { sensitivity: "base" });
+}
+
+// Tags grouped into families for the Browse people filter. Each node is a
+// family or a tag without one: { key, label, count, keys, children }.
+// `keys` are the lowercase tags the node stands for (the family's own tag, if
+// used, plus all its tags); `count` is how many people have any of them.
+// Nodes and children are ordered most used first, then A–Z.
+export function buildTagTree(records) {
+  const nodes = new Map(); // lowercase family-or-tag -> node
+  const children = new Map(); // lowercase full tag -> child
+  for (const [index, record] of records.entries()) {
+    for (const tag of record.tags || []) {
+      const { family, name } = parseTag(tag);
+      const groupLabel = family || name;
+      const groupKey = groupLabel.toLowerCase();
+      let node = nodes.get(groupKey);
+      if (!node) {
+        node = { key: groupKey, label: groupLabel, people: new Set(), keys: new Set(), children: [] };
+        nodes.set(groupKey, node);
+      }
+      node.people.add(index);
+      node.keys.add(tag.toLowerCase());
+      if (family) {
+        const key = tag.toLowerCase();
+        let child = children.get(key);
+        if (!child) {
+          child = { key, tag, label: name, count: 0 };
+          children.set(key, child);
+          node.children.push(child);
+        }
+        child.count++;
+      }
+    }
+  }
+  const order = (a, b) => b.count - a.count || a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+  return [...nodes.values()]
+    .map(({ people, keys, children: kids, ...node }) => ({
+      ...node,
+      count: people.size,
+      keys: [...keys],
+      children: kids.sort(order),
+    }))
+    .sort(order);
 }
 
 // Browse people filter: everyone while "All" is checked; otherwise people
@@ -135,7 +249,8 @@ export function filterTags(known, applied, query) {
 }
 
 // Every tag — known ones plus any applied tag not known yet — whose name
-// contains `query`, A–Z, each flagged with whether it's on the contact.
+// (or its family) contains `query`, grouped by family A–Z, each flagged
+// with whether it's on the contact.
 export function listAllTags(known, applied, query) {
   const q = query.trim().toLowerCase();
   const selected = new Set(applied.map((t) => t.toLowerCase()));
@@ -146,7 +261,7 @@ export function listAllTags(known, applied, query) {
   }
   return [...byKey.entries()]
     .filter(([key]) => key.includes(q))
-    .sort(([, a], [, b]) => a.localeCompare(b))
+    .sort(([, a], [, b]) => familyGroupCompare(a, b))
     .map(([key, tag]) => ({ tag, selected: selected.has(key) }));
 }
 
