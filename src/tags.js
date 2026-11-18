@@ -53,20 +53,72 @@ export function collectTagCounts(records) {
 
 /* ---------- Known tags (autocomplete) ---------- */
 
+function recordTime(record) {
+  const t = Date.parse(record.updatedAt || record.addedAt || "");
+  return Number.isNaN(t) ? 0 : t;
+}
+
+// Every tag, most recently used first: a tag's time is the latest save of any
+// record carrying it. Ties (e.g. records with no dates) fall back to A–Z.
+export function collectRecentTags(records) {
+  const tags = new Map(); // lowercase tag -> { label, last }
+  for (const record of records) {
+    const time = recordTime(record);
+    for (const tag of record.tags || []) {
+      const key = tag.toLowerCase();
+      const existing = tags.get(key);
+      if (!existing) tags.set(key, { label: tag, last: time });
+      else if (time > existing.last) existing.last = time;
+    }
+  }
+  return [...tags.values()]
+    .sort((a, b) => b.last - a.last || a.label.localeCompare(b.label))
+    .map((t) => t.label);
+}
+
+// Known tags not already applied whose name contains `query` (case-insensitive),
+// in known-tags order. An empty query matches everything.
+export function filterTags(known, applied, query) {
+  const q = query.trim().toLowerCase();
+  const skip = new Set(applied.map((t) => t.toLowerCase()));
+  return known.filter((t) => !skip.has(t.toLowerCase()) && t.toLowerCase().includes(q));
+}
+
+// Every tag — known ones plus any applied tag not known yet — whose name
+// contains `query`, A–Z, each flagged with whether it's on the contact.
+export function listAllTags(known, applied, query) {
+  const q = query.trim().toLowerCase();
+  const selected = new Set(applied.map((t) => t.toLowerCase()));
+  const byKey = new Map();
+  for (const tag of [...applied, ...known]) {
+    const key = tag.toLowerCase();
+    if (!byKey.has(key)) byKey.set(key, tag); // applied spelling wins
+  }
+  return [...byKey.entries()]
+    .filter(([key]) => key.includes(q))
+    .sort(([, a], [, b]) => a.localeCompare(b))
+    .map(([key, tag]) => ({ tag, selected: selected.has(key) }));
+}
+
 export function getKnownTags() {
   return knownTags;
 }
 
 export function setKnownTagsFromRecords(records) {
-  knownTags = collectTagCounts(records).map((t) => t.label);
+  knownTags = collectRecentTags(records);
 }
 
-export function mergeKnownTags(tags) {
-  const have = new Set(knownTags.map((t) => t.toLowerCase()));
+// Tags just added to a contact become the most recent: move them (or add
+// them, if new) to the front, without creating case-only duplicates.
+export function markTagsUsed(tags) {
+  const used = [];
+  const seen = new Set();
   for (const tag of tags) {
-    if (!have.has(tag.toLowerCase())) {
-      knownTags.push(tag);
-      have.add(tag.toLowerCase());
-    }
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    // keep the spelling already known, so "tech" doesn't relabel "Tech"
+    used.push(knownTags.find((t) => t.toLowerCase() === key) || tag);
   }
+  knownTags = [...used, ...knownTags.filter((t) => !seen.has(t.toLowerCase()))];
 }

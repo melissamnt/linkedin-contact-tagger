@@ -487,6 +487,124 @@ main {
   outline-offset: 2px;
 }
 
+/* display:flex above would otherwise beat the hidden attribute. */
+.tag-suggestions[hidden],
+.tag-list[hidden] {
+  display: none;
+}
+
+.tag-suggestion-all {
+  border-style: solid;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Full, scrollable tag list opened from "All tags (N)". */
+.tag-list {
+  margin-top: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.tag-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tag-list-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.tag-list-done {
+  padding: 2px 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.tag-list-done:hover {
+  color: var(--accent-hover);
+}
+
+.tag-list-done:focus-visible,
+.tag-list-item:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: -2px;
+}
+
+.tag-list-items {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.tag-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+}
+
+/* Selection shows only as the filled checkbox — no row color, no bold. */
+.tag-list-item {
+  background: transparent;
+}
+
+.tag-list-item:hover {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.tag-list-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.tag-list-item.is-selected .tag-list-check {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg-elevated);
+}
+
+.tag-list-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.tag-list-empty {
+  margin: 0;
+  padding: 10px 8px;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
 /* ---------- Text inputs ---------- */
 
 .note-input,

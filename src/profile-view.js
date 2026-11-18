@@ -15,6 +15,7 @@ import {
   elSuggestionChip,
   elSuggestionRationale,
   elSyncStatus,
+  elTagList,
   elTagSuggestions,
   elTagsInput,
   flashSavedConfirm,
@@ -33,7 +34,7 @@ import {
 } from "./storage.js";
 import { fetchAllRecords, fetchRemote, pushRemote } from "./sheet-sync.js";
 import { callClaudeSuggestion, extractVisibleProfileText } from "./claude.js";
-import { getKnownTags, mergeKnownTags, setKnownTagsFromRecords, tagColorClass } from "./tags.js";
+import { filterTags, getKnownTags, listAllTags, markTagsUsed, setKnownTagsFromRecords, tagColorClass } from "./tags.js";
 
 /* ---------- State ---------- */
 
@@ -59,7 +60,7 @@ function markDirty() {
 
 function renderChips() {
   elChipsList.innerHTML = "";
-  for (const [index, tag] of currentTags.entries()) {
+  for (const tag of currentTags) {
     const chip = document.createElement("span");
     chip.className = `chip ${tagColorClass(tag)}`;
     chip.textContent = tag;
@@ -72,16 +73,21 @@ function renderChips() {
     // Without this, clicking "×" while typing blurs the input first; the blur
     // handler re-renders the chips, the button vanishes and the click is lost.
     remove.addEventListener("mousedown", (e) => e.preventDefault());
-    remove.addEventListener("click", () => {
-      currentTags.splice(index, 1);
-      markDirty();
-      renderChips();
-      renderTagSuggestions();
-    });
+    remove.addEventListener("click", () => removeTag(tag));
 
     chip.appendChild(remove);
     elChipsList.appendChild(chip);
   }
+}
+
+function removeTag(tag) {
+  const key = tag.toLowerCase();
+  const before = currentTags.length;
+  currentTags = currentTags.filter((t) => t.toLowerCase() !== key);
+  if (currentTags.length === before) return;
+  markDirty();
+  renderChips();
+  renderTagSuggestions();
 }
 
 function addTag(raw) {
@@ -97,7 +103,7 @@ function addTag(raw) {
     }
   }
   renderChips();
-  mergeKnownTags(currentTags);
+  markTagsUsed(parts);
   renderTagSuggestions();
 }
 
@@ -106,34 +112,138 @@ function addTag(raw) {
 export async function refreshKnownTags() {
   const { records } = await fetchAllRecords();
   setKnownTagsFromRecords(records);
+  renderTagSuggestions();
+}
+
+const SUGGESTION_LIMIT = 8;
+let allTagsOpen = false; // the "All tags" multi-select list is showing instead of the top suggestions
+
+// Picking a tag from the suggestions or the All tags list. Runs on mousedown
+// (not click) with preventDefault, so the input never blurs — its blur
+// handler would otherwise commit half-typed text and close the list first.
+function pickTagOnMousedown(btn, tag) {
+  btn.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    addTag(tag);
+    elTagsInput.value = "";
+    renderTagSuggestions();
+    elTagsInput.focus();
+  });
+}
+
+let suggestionsActive = false; // the tag input is focused: show suggestion chips (the All tags button shows regardless)
+
+function openAllTags() {
+  allTagsOpen = true;
+  suggestionsActive = true;
+  renderTagSuggestions();
+  elTagsInput.focus(); // so typing filters the list, even if it was opened with the input unfocused
+}
+
+function closeAllTags() {
+  allTagsOpen = false;
+  renderTagSuggestions();
+}
+
+// Input blurred or Escape: drop the chips and the list, keep the All tags button.
+function hideTagMenus() {
+  allTagsOpen = false;
+  suggestionsActive = false;
+  renderTagSuggestions();
 }
 
 function renderTagSuggestions() {
-  const query = elTagsInput.value.trim().toLowerCase();
-  const applied = new Set(currentTags.map((t) => t.toLowerCase()));
-  const matches = getKnownTags()
-    .filter((t) => !applied.has(t.toLowerCase()) && (query === "" || t.toLowerCase().includes(query)))
-    .slice(0, 8);
+  if (allTagsOpen) renderAllTagsList(listAllTags(getKnownTags(), currentTags, elTagsInput.value));
+  else renderTopSuggestions(filterTags(getKnownTags(), currentTags, elTagsInput.value));
+}
 
+function renderTopSuggestions(matches) {
+  elTagList.hidden = true;
   elTagSuggestions.innerHTML = "";
-  elTagSuggestions.hidden = matches.length === 0;
+  elTagSuggestions.hidden = false; // never hidden: it always holds the All tags button
 
-  for (const tag of matches) {
+  if (suggestionsActive) {
+    for (const tag of matches.slice(0, SUGGESTION_LIMIT)) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "tag-suggestion";
+      btn.textContent = tag;
+      pickTagOnMousedown(btn, tag);
+      elTagSuggestions.appendChild(btn);
+    }
+  }
+
+  // Always there — focused or not, matches or not — so the full list is one click away.
+  const all = document.createElement("button");
+  all.type = "button";
+  all.className = "tag-suggestion tag-suggestion-all";
+  all.textContent = "All tags";
+  all.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    openAllTags();
+  });
+  elTagSuggestions.appendChild(all);
+}
+
+// Multi-select over every tag: chosen ones are highlighted in their color
+// with a check, and clicking a row toggles it on or off the contact.
+function renderAllTagsList(rows) {
+  elTagSuggestions.hidden = true;
+  elTagList.hidden = false;
+  elTagList.innerHTML = "";
+
+  const head = document.createElement("div");
+  head.className = "tag-list-head";
+  const title = document.createElement("span");
+  title.className = "tag-list-title";
+  const chosen = currentTags.length;
+  title.textContent = elTagsInput.value.trim()
+    ? `Matching tags (${rows.length})`
+    : `All tags (${rows.length}) · ${chosen} selected`;
+  const done = document.createElement("button");
+  done.type = "button";
+  done.className = "tag-list-done";
+  done.textContent = "Done";
+  done.addEventListener("click", closeAllTags);
+  head.append(title, done);
+  elTagList.appendChild(head);
+
+  const items = document.createElement("div");
+  items.className = "tag-list-items";
+  items.setAttribute("role", "group");
+  items.setAttribute("aria-label", "All tags");
+  if (rows.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "tag-list-empty";
+    empty.textContent = "No matching tags — press Enter to add it as a new tag.";
+    items.appendChild(empty);
+  }
+  for (const { tag, selected } of rows) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "tag-suggestion";
-    btn.textContent = tag;
-    // mousedown (not click) fires before the input's blur, so the tag is
-    // added before addTag()'s own blur handler would otherwise fire first.
+    btn.className = selected ? "tag-list-item is-selected" : "tag-list-item";
+    btn.setAttribute("aria-pressed", String(selected));
+    const check = document.createElement("span");
+    check.className = "tag-list-check";
+    check.setAttribute("aria-hidden", "true");
+    check.textContent = selected ? "✓" : "";
+    const dot = document.createElement("span");
+    dot.className = `tag-list-dot ${tagColorClass(tag)}`;
+    const label = document.createElement("span");
+    label.textContent = tag;
+    btn.append(check, dot, label);
+    // mousedown + preventDefault keeps focus in the input (see pickTagOnMousedown).
     btn.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      addTag(tag);
+      if (selected) removeTag(tag);
+      else addTag(tag);
       elTagsInput.value = "";
       renderTagSuggestions();
       elTagsInput.focus();
     });
-    elTagSuggestions.appendChild(btn);
+    items.appendChild(btn);
   }
+  elTagList.appendChild(items);
 }
 
 /* ---------- Status ---------- */
@@ -190,6 +300,7 @@ function setCurrentName(name) {
 function applyRecordToForm(record) {
   currentTags = record?.tags ? [...record.tags] : [];
   renderChips();
+  renderTagSuggestions();
   elNoteInput.value = record?.note || "";
   setStatus(record?.status || "");
   currentAddedAt = record?.addedAt || null;
@@ -207,6 +318,7 @@ function restoreDraft(url) {
   if (!draft) return false;
   currentTags = [...draft.tags];
   renderChips();
+  renderTagSuggestions();
   elNoteInput.value = draft.note;
   setStatus(draft.status);
   formDirty = true; // still unsaved — and keeps remote data from overwriting it
@@ -437,21 +549,31 @@ export function initProfileView() {
       renderChips();
       renderTagSuggestions();
     } else if (e.key === "Escape") {
-      elTagSuggestions.hidden = true;
+      hideTagMenus();
     }
   });
 
-  elTagsInput.addEventListener("input", renderTagSuggestions);
+  elTagsInput.addEventListener("input", () => {
+    suggestionsActive = true; // typing after Escape brings the chips back
+    renderTagSuggestions();
+  });
   elNoteInput.addEventListener("input", markDirty);
-  elTagsInput.addEventListener("focus", renderTagSuggestions);
+  elTagsInput.addEventListener("focus", () => {
+    suggestionsActive = true;
+    renderTagSuggestions();
+  });
 
   elTagsInput.addEventListener("blur", () => {
     if (elTagsInput.value.trim()) {
       addTag(elTagsInput.value);
       elTagsInput.value = "";
     }
-    elTagSuggestions.hidden = true;
+    hideTagMenus();
   });
+
+  // Clicks on the list's padding, header or scrollbar must not blur the input
+  // (that would close the list). "Done" still gets its click.
+  elTagList.addEventListener("mousedown", (e) => e.preventDefault());
 
   elSaveBtn.addEventListener("click", saveCurrentProfile);
 

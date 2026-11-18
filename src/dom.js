@@ -13,6 +13,7 @@ export const elProfileUrl = $("profileUrl");
 export const elChipsList = $("chipsList");
 export const elTagsInput = $("tagsInput");
 export const elTagSuggestions = $("tagSuggestions");
+export const elTagList = $("tagList");
 export const elNoteInput = $("noteInput");
 export const elSaveBtn = $("saveBtn");
 export const elSavedConfirm = $("savedConfirm");
