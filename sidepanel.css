@@ -910,6 +910,19 @@ main {
   margin-bottom: 22px;
 }
 
+/* Filter tags on the left, date-added sort on the right; the dropdown opens below. */
+.browse-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.browse-sort {
+  margin-bottom: 0;
+}
+
 .filter-btn-summary {
   color: var(--ink-faint);
   font-weight: 400;

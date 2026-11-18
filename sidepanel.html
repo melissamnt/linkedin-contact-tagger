@@ -145,9 +145,16 @@
       <p class="loader" id="browseLoading" role="status" hidden><span class="spinner" aria-hidden="true"></span>Loading your connections…</p>
 
       <div class="browse-filter-wrap" id="browseFilterWrap">
-        <button type="button" class="tag-suggestion tag-suggestion-all filter-btn" id="browseFilterBtn" aria-expanded="false" aria-controls="browseFilter">
-          Filter tags <span class="filter-btn-summary" id="browseFilterSummary"></span>
-        </button>
+        <div class="browse-toolbar">
+          <button type="button" class="tag-suggestion tag-suggestion-all filter-btn" id="browseFilterBtn" aria-expanded="false" aria-controls="browseFilter">
+            Filter tags <span class="filter-btn-summary" id="browseFilterSummary"></span>
+          </button>
+          <div class="tm-sort browse-sort" id="browseSort" role="radiogroup" aria-label="Sort by date added">
+            <span class="tm-sort-label">Added</span>
+            <button type="button" role="radio" data-sort="newest">Newest</button>
+            <button type="button" role="radio" data-sort="oldest">Oldest</button>
+          </div>
+        </div>
         <div class="tag-list" id="browseFilter" role="group" aria-label="Filter by tag" hidden></div>
       </div>
 

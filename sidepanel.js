@@ -5,6 +5,7 @@
  *   storage.js       chrome.storage.local: settings, records, cached suggestions
  *   sheet-sync.js    Apps Script Web App (Google Sheet) sync
  *   claude.js        Claude API status suggestion
+ *   records.js       sorting contacts by date added (pure)
  *   tags.js          tag colors, counts, autocomplete (recent order + filter)
  *   dom.js           element references + shared view helpers
  *   profile-view.js  the profile form (tags, note, status, save, suggest)

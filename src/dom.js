@@ -45,6 +45,7 @@ export const elBrowseFilterWrap = $("browseFilterWrap");
 export const elBrowseFilterBtn = $("browseFilterBtn");
 export const elBrowseFilterSummary = $("browseFilterSummary");
 export const elBrowseFilter = $("browseFilter");
+export const elBrowseSort = $("browseSort");
 export const elBrowseList = $("browseList");
 export const elBrowseEmpty = $("browseEmpty");
 export const elBrowseBackBtn = $("browseBackBtn");
