@@ -111,12 +111,12 @@ test("known tags: built most-recent first; markTagsUsed moves used tags to the f
 test("listAllTags: every tag A–Z, applied ones flagged, filtered by query", () => {
   const known = ["Tech", "Startup", "SF"];
   assert.deepEqual(listAllTags(known, ["startup", "Brand new"], ""), [
-    { tag: "Brand new", selected: true }, // applied but not known yet still listed
-    { tag: "SF", selected: false },
-    { tag: "startup", selected: true }, // applied spelling wins, no duplicate
-    { tag: "Tech", selected: false },
+    { tag: "Brand new", selected: true, inFamily: false }, // applied but not known yet still listed
+    { tag: "SF", selected: false, inFamily: false },
+    { tag: "startup", selected: true, inFamily: false }, // applied spelling wins, no duplicate
+    { tag: "Tech", selected: false, inFamily: false },
   ]);
-  assert.deepEqual(listAllTags(known, ["Startup"], "STAR"), [{ tag: "Startup", selected: true }]);
+  assert.deepEqual(listAllTags(known, ["Startup"], "STAR"), [{ tag: "Startup", selected: true, inFamily: false }]);
 });
 
 test("validateTagName: empty, commas and existing names refused; capitals-only change allowed", () => {
@@ -232,11 +232,18 @@ test("validateTagName: families allowed, one > at most, duplicates compared norm
   assert.equal(validateTagName(" > ", "SF", existing), "Name can't be empty.");
 });
 
-test("listAllTags: a family's own tag first, then its tags A–Z, grouped with flat tags", () => {
+test("listAllTags: families (own tag first, then its tags) before tags without a family", () => {
   const known = ["Education > Uniandes", "SF", "Education", "Education > DS4A", "Design", "Events > Web Summit"];
   assert.deepEqual(
-    listAllTags(known, [], "").map((r) => r.tag),
-    ["Design", "Education", "Education > DS4A", "Education > Uniandes", "Events > Web Summit", "SF"]
+    listAllTags(known, [], "").map((r) => [r.tag, r.inFamily]),
+    [
+      ["Education", true],
+      ["Education > DS4A", true],
+      ["Education > Uniandes", true],
+      ["Events > Web Summit", true],
+      ["Design", false],
+      ["SF", false],
+    ]
   );
   // searching a family name finds its tags
   assert.deepEqual(listAllTags(known, [], "educ").map((r) => r.tag), ["Education", "Education > DS4A", "Education > Uniandes"]);

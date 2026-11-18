@@ -261,9 +261,19 @@ function renderAllTagsList(rows) {
   // Rows arrive grouped by family; a family's tags get its name as a small
   // heading (unless the family is a tag itself, which then heads the group).
   let lastGroup = null;
-  for (const { tag, selected } of rows) {
+  const hasFamilies = rows.some((r) => r.inFamily);
+  let otherHeadingShown = false;
+  for (const { tag, selected, inFamily } of rows) {
     const { family, name } = parseTag(tag);
     const group = (family || name).toLowerCase();
+    // After the families, tags without one get their own small heading.
+    if (!inFamily && hasFamilies && !otherHeadingShown) {
+      const heading = document.createElement("div");
+      heading.className = "tag-list-group";
+      heading.textContent = "Other tags";
+      items.appendChild(heading);
+      otherHeadingShown = true;
+    }
     if (family && group !== lastGroup) {
       const heading = document.createElement("div");
       heading.className = "tag-list-group";
