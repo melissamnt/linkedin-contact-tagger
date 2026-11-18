@@ -50,6 +50,7 @@ let currentStatus = ""; // "" | "Keep" | "Unsure" | "Remove" — the accepted, s
 let pendingSuggestion = null; // { status, rationale } — an AI suggestion not yet accepted
 let viewBeforeOverlay = "empty"; // "profile" | "empty" — where Settings/Browse should return to
 let loadToken = 0; // guards against stale async responses after fast tab switches
+let formDirty = false; // true once the user edits tags/note/status after the form was loaded or saved
 
 let browseRecords = [];
 let browseSelectedTag = null; // null means "All"
@@ -130,6 +131,19 @@ async function setLocalRecord(record) {
   await chrome.storage.local.set({ [profileKey(record.profileUrl)]: record });
 }
 
+// Clears the pendingSync flag once `record` reached the Sheet — but only if
+// the local copy is still that same save (a newer save keeps its own flag).
+async function markSynced(record) {
+  const local = await getLocalRecord(record.profileUrl);
+  if (local && local.updatedAt === record.updatedAt) {
+    await setLocalRecord({ ...local, pendingSync: false });
+  }
+}
+
+function markDirty() {
+  formDirty = true;
+}
+
 /* ---------- Remote sync (Apps Script Web App) ---------- */
 /*
  * Requests use text/plain bodies and no custom headers so they stay
@@ -158,10 +172,11 @@ async function pushRemote(record) {
   const { webAppUrl, token } = await getSettings();
   if (!webAppUrl || !token) return { configured: false };
 
+  const { pendingSync, ...payload } = record; // local-only bookkeeping, not a Sheet column
   const res = await fetch(webAppUrl, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ ...record, token }),
+    body: JSON.stringify({ ...payload, token }),
   });
   if (!res.ok) throw new Error(`POST ${res.status}`);
   const json = await res.json();
@@ -206,6 +221,7 @@ function renderChips() {
     remove.textContent = "×";
     remove.addEventListener("click", () => {
       currentTags.splice(index, 1);
+      markDirty();
       renderChips();
       renderTagSuggestions();
     });
@@ -219,7 +235,10 @@ function addTag(raw) {
   const tag = raw.trim().replace(/,+$/, "").trim();
   if (!tag) return;
   const exists = currentTags.some((t) => t.toLowerCase() === tag.toLowerCase());
-  if (!exists) currentTags.push(tag);
+  if (!exists) {
+    currentTags.push(tag);
+    markDirty();
+  }
   renderChips();
   mergeKnownTags(currentTags);
   renderTagSuggestions();
@@ -328,6 +347,7 @@ function applyRecordToForm(record) {
   elNoteInput.value = record?.note || "";
   setStatus(record?.status || "");
   currentAddedAt = record?.addedAt || null;
+  formDirty = false;
 }
 
 async function loadProfile(url, name) {
@@ -351,17 +371,30 @@ async function loadProfile(url, name) {
   if (cachedSuggestion) renderSuggestion(cachedSuggestion.status, cachedSuggestion.rationale);
 
   if (!webAppUrl || !token) {
-    elSyncStatus.textContent = "Not synced — add your Sheet URL in Settings.";
+    elSyncStatus.textContent = cached?.pendingSync
+      ? "Saved locally — add your Sheet URL in Settings to sync."
+      : "Not synced — add your Sheet URL in Settings.";
     return;
   }
 
   elSyncStatus.textContent = "Syncing…";
   try {
+    // A previous save never reached the Sheet: the local copy is the newest
+    // version, so push it now instead of letting the stale remote row win.
+    if (cached?.pendingSync) {
+      await pushRemote(cached);
+      await markSynced(cached);
+      if (myToken !== loadToken) return;
+      elSyncStatus.textContent = "Synced";
+      return;
+    }
+
     const { record } = await fetchRemote(url);
     if (myToken !== loadToken) return;
-    if (record) {
+    // Don't clobber edits the user started while the fetch was in flight.
+    if (record && !formDirty) {
       applyRecordToForm(record);
-      await setLocalRecord({ ...record, profileUrl: url, name: name || record.name });
+      await setLocalRecord({ ...record, profileUrl: url, name: name || record.name, pendingSync: false });
     }
     elSyncStatus.textContent = "Synced";
   } catch (err) {
@@ -394,6 +427,17 @@ async function refreshForActiveTab() {
   if (url) {
     viewBeforeOverlay = "profile";
     showView("profile");
+    if (url === currentProfileUrl) {
+      // Same profile — just a title/load-status change or a window refocus.
+      // Reloading here would wipe unsaved edits, so only refresh the name
+      // (LinkedIn often updates the title after the URL on SPA navigation).
+      const freshName = extractNameFromTitle(tab.title);
+      if (freshName && freshName !== currentName) {
+        currentName = freshName;
+        elProfileName.textContent = freshName;
+      }
+      return;
+    }
     await loadProfile(url, extractNameFromTitle(tab.title));
   } else {
     viewBeforeOverlay = "empty";
@@ -412,6 +456,7 @@ elTagsInput.addEventListener("keydown", (e) => {
     renderTagSuggestions();
   } else if (e.key === "Backspace" && elTagsInput.value === "" && currentTags.length) {
     currentTags.pop();
+    markDirty();
     renderChips();
     renderTagSuggestions();
   } else if (e.key === "Escape") {
@@ -420,6 +465,7 @@ elTagsInput.addEventListener("keydown", (e) => {
 });
 
 elTagsInput.addEventListener("input", renderTagSuggestions);
+elNoteInput.addEventListener("input", markDirty);
 elTagsInput.addEventListener("focus", renderTagSuggestions);
 
 elTagsInput.addEventListener("blur", () => {
@@ -433,6 +479,10 @@ elTagsInput.addEventListener("blur", () => {
 elSaveBtn.addEventListener("click", async () => {
   if (!currentProfileUrl) return;
 
+  // Cancel any in-flight profile load so its (older) remote record can't
+  // land after this save and overwrite the form or the local copy.
+  ++loadToken;
+
   currentAddedAt = currentAddedAt || new Date().toISOString();
 
   const record = {
@@ -443,23 +493,30 @@ elSaveBtn.addEventListener("click", async () => {
     status: getStatus(),
     addedAt: currentAddedAt,
     updatedAt: new Date().toISOString(),
+    pendingSync: true, // cleared once the Sheet confirms; retried on next load otherwise
   };
 
+  formDirty = false;
   await setLocalRecord(record);
   flashSavedConfirm(elSavedConfirm);
 
+  const isStillShown = () => currentProfileUrl === record.profileUrl;
+
   const { webAppUrl, token } = await getSettings();
   if (!webAppUrl || !token) {
-    elSyncStatus.textContent = "Saved locally — add your Sheet URL in Settings to sync.";
+    if (isStillShown()) elSyncStatus.textContent = "Saved locally — add your Sheet URL in Settings to sync.";
     return;
   }
 
-  elSyncStatus.textContent = "Syncing…";
+  if (isStillShown()) elSyncStatus.textContent = "Syncing…";
   try {
     await pushRemote(record);
-    elSyncStatus.textContent = "Synced";
+    await markSynced(record);
+    if (isStillShown()) elSyncStatus.textContent = "Synced";
   } catch (err) {
-    elSyncStatus.textContent = "Saved locally — sync failed, will retry next time.";
+    if (isStillShown()) {
+      elSyncStatus.textContent = "Saved locally — sync failed, will retry when you reopen this profile.";
+    }
   }
 });
 
@@ -543,15 +600,23 @@ elSuggestionChip.addEventListener("click", () => {
   const status = pendingSuggestion.status;
   pendingSuggestion = null;
   setStatus(status);
+  markDirty();
   if (currentProfileUrl) clearCachedSuggestion(currentProfileUrl);
 });
 
 elStatusPill.addEventListener("click", () => {
   setStatus("");
+  markDirty();
 });
 
 elSuggestStatusBtn.addEventListener("click", async () => {
   if (!currentProfileUrl) return;
+
+  // Pin the profile this request is for: the user may switch tabs while
+  // Claude is thinking, and the answer must not land on the new profile.
+  const url = currentProfileUrl;
+  const name = currentName;
+  const note = elNoteInput.value;
 
   const { claudeApiKey } = await getSettings();
   if (!claudeApiKey) {
@@ -567,7 +632,7 @@ elSuggestStatusBtn.addEventListener("click", async () => {
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     const tab = tabs[0];
-    if (!tab || extractProfileUrl(tab.url) !== currentProfileUrl) {
+    if (!tab || extractProfileUrl(tab.url) !== url) {
       throw new Error("Open the profile tab to get a suggestion");
     }
 
@@ -576,16 +641,12 @@ elSuggestStatusBtn.addEventListener("click", async () => {
       func: extractVisibleProfileText,
     });
 
-    const { status, rationale } = await callClaudeSuggestion(claudeApiKey, {
-      name: currentName,
-      note: elNoteInput.value,
-      pageText,
-    });
+    const { status, rationale } = await callClaudeSuggestion(claudeApiKey, { name, note, pageText });
 
-    renderSuggestion(status, rationale);
-    await setCachedSuggestion(currentProfileUrl, status, rationale);
+    await setCachedSuggestion(url, status, rationale);
+    if (currentProfileUrl === url) renderSuggestion(status, rationale);
   } catch (err) {
-    showSuggestionError(`Couldn't get a suggestion — ${err.message}`);
+    if (currentProfileUrl === url) showSuggestionError(`Couldn't get a suggestion — ${err.message}`);
   } finally {
     elSuggestStatusBtn.disabled = false;
     elSuggestStatusBtn.textContent = "Suggest";
