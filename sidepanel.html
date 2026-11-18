@@ -137,7 +137,12 @@
     <section id="browseView" class="view" hidden>
       <h2 class="settings-title">Browse people</h2>
 
-      <div class="browse-filter" id="browseFilter" role="group" aria-label="Filter by tag"></div>
+      <div class="browse-filter-wrap" id="browseFilterWrap">
+        <button type="button" class="tag-suggestion tag-suggestion-all filter-btn" id="browseFilterBtn" aria-expanded="false" aria-controls="browseFilter">
+          Filter tags <span class="filter-btn-summary" id="browseFilterSummary"></span>
+        </button>
+        <div class="tag-list" id="browseFilter" role="group" aria-label="Filter by tag" hidden></div>
+      </div>
 
       <div class="browse-list" id="browseList"></div>
       <p id="browseEmpty" class="empty-text browse-empty" hidden>No connections tagged yet.</p>

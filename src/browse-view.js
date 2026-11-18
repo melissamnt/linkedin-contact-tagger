@@ -1,6 +1,15 @@
 /* Browse people: every saved connection, filtered by a checklist of tags. (Editing tags lives in tag-manager-view.js.) */
 
-import { elBrowseToggle, elBrowseFilter, elBrowseList, elBrowseEmpty, showView } from "./dom.js";
+import {
+  elBrowseEmpty,
+  elBrowseFilter,
+  elBrowseFilterBtn,
+  elBrowseFilterSummary,
+  elBrowseFilterWrap,
+  elBrowseList,
+  elBrowseToggle,
+  showView,
+} from "./dom.js";
 import { fetchAllRecords } from "./sheet-sync.js";
 import { collectTagCounts, filterRecordsByTags, setKnownTagsFromRecords, tagColorClass, tagStripeClass } from "./tags.js";
 
@@ -9,6 +18,7 @@ let browseRecords = [];
 // and then only people with at least one checked tag are shown.
 let allSelected = true;
 let selectedTags = new Set(); // lowercase tags that are checked
+let filterOpen = false; // the Filter tags dropdown is showing
 
 function formatDate(iso) {
   const d = new Date(iso);
@@ -47,10 +57,57 @@ function rerender() {
   renderBrowseList();
 }
 
+function setFilterOpen(open) {
+  filterOpen = open;
+  renderFilter();
+}
+
+function renderFilterSummary() {
+  elBrowseFilterSummary.textContent = allSelected
+    ? "· All"
+    : selectedTags.size === 0
+      ? "· None"
+      : `· ${selectedTags.size} selected`;
+}
+
 function renderFilter() {
+  renderFilterSummary();
+  elBrowseFilterBtn.setAttribute("aria-expanded", String(filterOpen));
+  elBrowseFilter.hidden = !filterOpen;
+  if (!filterOpen) {
+    elBrowseFilter.innerHTML = "";
+    return;
+  }
+
   const tagCounts = collectTagCounts(browseRecords);
   const scroll = elBrowseFilter.querySelector(".tag-list-items")?.scrollTop || 0;
   elBrowseFilter.innerHTML = "";
+
+  const head = document.createElement("div");
+  head.className = "tag-list-head";
+  const title = document.createElement("span");
+  title.className = "tag-list-title";
+  title.textContent = "Filter tags";
+  const actions = document.createElement("span");
+  actions.className = "tag-list-actions";
+  const clear = document.createElement("button");
+  clear.type = "button";
+  clear.className = "tag-list-done tag-list-clear";
+  clear.textContent = "Clear all";
+  clear.disabled = !allSelected && selectedTags.size === 0;
+  clear.addEventListener("click", () => {
+    allSelected = false;
+    selectedTags = new Set();
+    rerender();
+  });
+  const done = document.createElement("button");
+  done.type = "button";
+  done.className = "tag-list-done";
+  done.textContent = "Done";
+  done.addEventListener("click", () => setFilterOpen(false));
+  actions.append(clear, done);
+  head.append(title, actions);
+  elBrowseFilter.appendChild(head);
 
   const items = document.createElement("div");
   items.className = "tag-list-items";
@@ -161,10 +218,19 @@ async function openBrowse() {
   browseRecords = records;
   allSelected = true;
   selectedTags = new Set(collectTagCounts(records).map((t) => t.label.toLowerCase()));
+  filterOpen = false;
   rerender();
   setKnownTagsFromRecords(records);
 }
 
 export function initBrowseView() {
   elBrowseToggle.addEventListener("click", openBrowse);
+  elBrowseFilterBtn.addEventListener("click", () => setFilterOpen(!filterOpen));
+  // Close on a click outside the dropdown or on Escape.
+  document.addEventListener("mousedown", (e) => {
+    if (filterOpen && !elBrowseFilterWrap.contains(e.target)) setFilterOpen(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (filterOpen && e.key === "Escape") setFilterOpen(false);
+  });
 }

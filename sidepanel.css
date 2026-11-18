@@ -859,12 +859,31 @@ main {
 
 /* ---------- Browse people filter ---------- */
 
-.browse-filter {
+.browse-filter-wrap {
   margin-bottom: 22px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
+}
+
+.filter-btn-summary {
+  color: var(--ink-faint);
+  font-weight: 400;
+}
+
+.tag-list-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.tag-list-clear {
+  color: var(--ink-muted);
+}
+
+.tag-list-clear:hover {
+  color: var(--ink);
+}
+
+.tag-list-clear:disabled {
+  color: var(--ink-faint);
+  cursor: default;
 }
 
 /* ---------- Tag manager ---------- */

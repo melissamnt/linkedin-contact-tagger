@@ -40,6 +40,9 @@ export const elSettingsSavedConfirm = $("settingsSavedConfirm");
 
 // Browse people
 export const elBrowseToggle = $("browseToggle");
+export const elBrowseFilterWrap = $("browseFilterWrap");
+export const elBrowseFilterBtn = $("browseFilterBtn");
+export const elBrowseFilterSummary = $("browseFilterSummary");
 export const elBrowseFilter = $("browseFilter");
 export const elBrowseList = $("browseList");
 export const elBrowseEmpty = $("browseEmpty");
