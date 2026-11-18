@@ -562,23 +562,13 @@ main {
   text-align: left;
 }
 
-/* Unselected rows are plain; selected ones keep their tag-color-N background. */
-.tag-list-item:not(.is-selected) {
+/* Selection shows only as the filled checkbox — no row color, no bold. */
+.tag-list-item {
   background: transparent;
 }
 
-.tag-list-item:not(.is-selected):hover {
+.tag-list-item:hover {
   background: color-mix(in srgb, var(--ink) 4%, transparent);
-}
-
-/* Selected rows get a neutral gray, not the tag's color — the dot shows that. */
-.tag-list-item.is-selected {
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-  font-weight: 600;
-}
-
-.tag-list-item.is-selected:hover {
-  background: color-mix(in srgb, var(--ink) 12%, transparent);
 }
 
 .tag-list-check {
