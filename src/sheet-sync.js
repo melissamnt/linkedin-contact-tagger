@@ -41,16 +41,16 @@ export async function pushRemote(record) {
   return { configured: true };
 }
 
-// Renames a tag on every Sheet row in one request. A Code.gs deployed before
-// the renameTag action treats the body as a save and answers "Missing profileUrl".
-export async function renameTagRemote(from, to) {
+// One POST to a Code.gs action. A Code.gs deployed before that action
+// existed treats the body as a save and answers "Missing profileUrl".
+async function postAction(body) {
   const { webAppUrl, token } = await getSettings();
   if (!webAppUrl || !token) return { configured: false };
 
   const res = await fetch(webAppUrl, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action: "renameTag", from, to, token }),
+    body: JSON.stringify({ ...body, token }),
   });
   if (!res.ok) throw new Error(`POST ${res.status}`);
   const json = await res.json();
@@ -61,6 +61,16 @@ export async function renameTagRemote(from, to) {
     throw new Error(json.error || "Unknown error");
   }
   return { configured: true, updated: json.updated };
+}
+
+// Renames a tag on every Sheet row in one request.
+export function renameTagRemote(from, to) {
+  return postAction({ action: "renameTag", from, to });
+}
+
+// Renames a tag family ("Education" -> "Studies") on every Sheet row in one request.
+export function renameFamilyRemote(from, to) {
+  return postAction({ action: "renameFamily", from, to });
 }
 
 // Saves that never reached the Sheet (pendingSync) exist only locally, or are

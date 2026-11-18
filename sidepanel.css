@@ -1017,6 +1017,11 @@ main {
   font-size: 13.5px;
 }
 
+/* A family's tags, indented under the family row. */
+.tm-row.is-child {
+  padding-left: 22px;
+}
+
 .tm-name {
   flex: 1;
   min-width: 0;
@@ -1062,9 +1067,17 @@ main {
   border-radius: var(--radius-md);
 }
 
-.tag-editor-color-label {
+.tag-editor-field-label {
   display: block;
   margin-top: 14px;
+}
+
+.tag-editor > .tag-editor-field-label:first-child {
+  margin-top: 0;
+}
+
+.tag-editor .field-hint {
+  margin: 6px 0 0;
 }
 
 .tag-editor-colors {

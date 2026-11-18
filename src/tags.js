@@ -82,6 +82,13 @@ export async function renameTagColor(from, to, index, colorChanged = true) {
   await chrome.storage.local.set({ tagColors: tagColorOverrides });
 }
 
+// A renamed family keeps its color (or the one picked while editing).
+export async function renameFamilyColor(from, to, index) {
+  delete tagColorOverrides[from.toLowerCase()];
+  tagColorOverrides[to.toLowerCase()] = index;
+  await chrome.storage.local.set({ tagColors: tagColorOverrides });
+}
+
 export function tagColorIndex(tag) {
   const s = colorKey(tag);
   if (s in tagColorOverrides) return tagColorOverrides[s];
@@ -125,6 +132,45 @@ export function renameTagInList(tags, from, to) {
     out.push(next);
   }
   return out;
+}
+
+// Lowercase family of a tag, or the tag itself when it has none — the key
+// a family is known by ("Education > DS4A" and "Education" -> "education").
+export function familyKeyOf(tag) {
+  const { family, name } = parseTag(tag);
+  return (family || name).toLowerCase();
+}
+
+// `tags` with family `from` renamed to `to`: "Education > X" -> "Studies > X",
+// and the family's own tag "Education" -> "Studies". No duplicates.
+export function renameFamilyInList(tags, from, to) {
+  const fromKey = from.toLowerCase();
+  const out = [];
+  const seen = new Set();
+  for (const tag of tags) {
+    let next = tag;
+    if (familyKeyOf(tag) === fromKey) {
+      const { family, name } = parseTag(tag);
+      next = family ? `${to}${FAMILY_SEPARATOR}${name}` : to;
+    }
+    if (seen.has(next.toLowerCase())) continue;
+    seen.add(next.toLowerCase());
+    out.push(next);
+  }
+  return out;
+}
+
+// Why family `from` can't be renamed to `to`, or null if it can. The new
+// name can't be used by another family or tag; a change of capitals is fine.
+export function validateFamilyName(to, from, existing) {
+  const name = to.trim();
+  if (!name) return "Name can't be empty.";
+  if (name.includes(",") || name.includes(">")) return 'Family names can\'t contain "," or ">".';
+  const key = name.toLowerCase();
+  if (key !== from.toLowerCase() && existing.some((t) => familyKeyOf(t) === key)) {
+    return `"${name}" already exists.`;
+  }
+  return null;
 }
 
 /* ---------- Counts ---------- */
@@ -196,6 +242,15 @@ export function buildTagTree(records) {
       children: kids.sort(order),
     }))
     .sort(order);
+}
+
+// Tag manager order for a tag tree: "count" (most used first, then A–Z),
+// "az" or "za" — for families and for the tags inside each family.
+export function sortTagTree(tree, mode) {
+  const byName = (a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+  const order =
+    mode === "az" ? byName : mode === "za" ? (a, b) => byName(b, a) : (a, b) => b.count - a.count || byName(a, b);
+  return [...tree].map((node) => ({ ...node, children: [...node.children].sort(order) })).sort(order);
 }
 
 // Browse people filter: everyone while "All" is checked; otherwise people
@@ -290,4 +345,8 @@ export function markTagsUsed(tags) {
 
 export function renameKnownTag(from, to) {
   knownTags = renameTagInList(knownTags, from, to);
+}
+
+export function renameKnownFamily(from, to) {
+  knownTags = renameFamilyInList(knownTags, from, to);
 }

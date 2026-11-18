@@ -14,6 +14,11 @@ import {
   markTagsUsed,
   matchFamilySpelling,
   normalizeTag,
+  renameFamilyColor,
+  renameFamilyInList,
+  renameKnownFamily,
+  sortTagTree,
+  validateFamilyName,
   parseTag,
   renameKnownTag,
   renameTagColor,
@@ -264,4 +269,46 @@ test("matchFamilySpelling: joins an existing family's spelling", () => {
   assert.equal(matchFamilySpelling("sf > Mission", known), "SF > Mission"); // a flat tag becomes the family
   assert.equal(matchFamilySpelling("Events > Web Summit", known), "Events > Web Summit");
   assert.equal(matchFamilySpelling("Tech", known), "Tech");
+});
+
+test("renameFamilyInList: family tags and the family's own tag, nothing else", () => {
+  assert.deepEqual(
+    renameFamilyInList(["Education > DS4A", "education", "Educational", "SF"], "Education", "Studies"),
+    ["Studies > DS4A", "Studies", "Educational", "SF"]
+  );
+  assert.deepEqual(renameFamilyInList(["Studies", "Education"], "Education", "Studies"), ["Studies"], "no duplicates");
+});
+
+test("validateFamilyName: refuses separators and names in use; capitals-only allowed", () => {
+  const existing = ["Education > DS4A", "SF", "Events > Web Summit"];
+  assert.equal(validateFamilyName("Studies", "Education", existing), null);
+  assert.equal(validateFamilyName("education", "Education", existing), null);
+  assert.equal(validateFamilyName("events", "Education", existing), '"events" already exists.');
+  assert.equal(validateFamilyName("SF", "Education", existing), '"SF" already exists.');
+  assert.equal(validateFamilyName("A > B", "Education", existing), 'Family names can\'t contain "," or ">".');
+  assert.equal(validateFamilyName(" ", "Education", existing), "Name can't be empty.");
+});
+
+test("renameFamilyColor / renameKnownFamily: color and autocomplete follow the new name", async () => {
+  const store = installFakeChrome({ tagColors: { education: 3 } });
+  await loadTagColorOverrides();
+  await renameFamilyColor("Education", "Studies", 3);
+  assert.deepEqual(store.tagColors, { studies: 3 });
+  assert.equal(tagColorIndex("Studies > DS4A"), 3);
+
+  setKnownTagsFromRecords([{ tags: ["Education > DS4A", "SF"], updatedAt: "2026-01-01T00:00:00Z" }]);
+  renameKnownFamily("Education", "Studies");
+  assert.deepEqual(getKnownTags(), ["Studies > DS4A", "SF"]); // renamed in place
+});
+
+test("sortTagTree: families and their tags follow the chosen order", () => {
+  const tree = buildTagTree([
+    { tags: ["Education > Uniandes", "Education > DS4A"] },
+    { tags: ["Education > Uniandes", "SF"] },
+    { tags: ["Art"] },
+  ]);
+  const view = (mode) => sortTagTree(tree, mode).map((n) => [n.label, n.children.map((c) => c.label)]);
+  assert.deepEqual(view("count"), [["Education", ["Uniandes", "DS4A"]], ["Art", []], ["SF", []]]);
+  assert.deepEqual(view("az"), [["Art", []], ["Education", ["DS4A", "Uniandes"]], ["SF", []]]);
+  assert.deepEqual(view("za"), [["SF", []], ["Education", ["Uniandes", "DS4A"]], ["Art", []]]);
 });

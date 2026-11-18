@@ -10,7 +10,7 @@
  *   dom.js           element references + shared view helpers
  *   profile-view.js  the profile form (tags, note, status, save, suggest)
  *   browse-view.js   browse people (tag checklist filter)
- *   tag-manager-view.js  tag manager: sort, rename, recolor
+ *   tag-manager-view.js  tag manager: families, sort, rename, move, recolor
  *   settings-view.js settings view
  */
 
