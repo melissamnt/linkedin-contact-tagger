@@ -263,16 +263,27 @@ function buildTagEditor(tag) {
     },
     family ? "Family color" : "Color"
   );
-  // Until a color is picked, preview the color the tag will have where it's going.
   const target = () => {
     const f = familyField.input.value.trim();
     const n = nameField.input.value.trim();
     return matchFamilySpelling(f ? `${f}${FAMILY_SEPARATOR}${n}` : n, allTags());
   };
+  // A family that already has a color: an existing family, or a tag without
+  // one that's about to become a family (they share the color key).
+  const existingFamily = () => {
+    const key = familyField.input.value.trim().toLowerCase();
+    if (!key) return null;
+    return buildTagTree(tmRecords).find((n) => n.key === key)?.label || null;
+  };
+  // Until a color is picked: typing an existing family's name previews that
+  // family's color. Anything else (a new family still being typed, or no
+  // family) keeps the tag's current color — it never changes per keystroke.
+  const startColor = colorIndex;
   familyField.input.addEventListener("input", () => {
     picker.label.textContent = familyField.input.value.trim() ? "Family color" : "Color";
     if (colorTouched) return;
-    colorIndex = tagColorIndex(target() || tag);
+    const match = existingFamily();
+    colorIndex = match ? tagColorIndex(match) : startColor;
     picker.render();
   });
 
@@ -287,7 +298,9 @@ function buildTagEditor(tag) {
       const to = target();
       const problem = validateTagName(to, tag, allTags());
       if (problem) return problem;
-      await saveTagEdit(tag, to, colorIndex, colorTouched);
+      // A brand-new family takes the color shown, rather than one of its own.
+      const newFamily = Boolean(familyField.input.value.trim()) && !existingFamily();
+      await saveTagEdit(tag, to, colorIndex, colorTouched || newFamily);
       return null;
     }
   );
