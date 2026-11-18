@@ -8,10 +8,12 @@ import {
   elBrowseFilterWrap,
   elBrowseList,
   elBrowseLoading,
+  elBrowseSort,
   elBrowseToggle,
   showView,
 } from "./dom.js";
 import { fetchAllRecords } from "./sheet-sync.js";
+import { sortRecordsByAdded } from "./records.js";
 import { collectTagCounts, filterRecordsByTags, setKnownTagsFromRecords, tagColorClass } from "./tags.js";
 
 let browseRecords = [];
@@ -20,6 +22,13 @@ let browseRecords = [];
 let allSelected = true;
 let selectedTags = new Set(); // lowercase tags that are checked
 let filterOpen = false; // the Filter tags dropdown is showing
+let addedOrder = "newest"; // "newest" | "oldest" — kept while the panel is open
+
+function renderSort() {
+  for (const btn of elBrowseSort.querySelectorAll("[data-sort]")) {
+    btn.setAttribute("aria-checked", String(btn.dataset.sort === addedOrder));
+  }
+}
 
 function formatDate(iso) {
   const d = new Date(iso);
@@ -154,7 +163,7 @@ function renderFilter() {
 }
 
 function renderBrowseList() {
-  const filtered = filterRecordsByTags(browseRecords, allSelected, selectedTags);
+  const filtered = sortRecordsByAdded(filterRecordsByTags(browseRecords, allSelected, selectedTags), addedOrder);
 
   elBrowseList.innerHTML = "";
   elBrowseEmpty.hidden = filtered.length > 0;
@@ -245,6 +254,14 @@ async function openBrowse() {
 export function initBrowseView() {
   elBrowseToggle.addEventListener("click", openBrowse);
   elBrowseFilterBtn.addEventListener("click", () => setFilterOpen(!filterOpen));
+  elBrowseSort.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-sort]");
+    if (!btn) return;
+    addedOrder = btn.dataset.sort;
+    renderSort();
+    renderBrowseList();
+  });
+  renderSort();
   // Close on a click outside the dropdown or on Escape.
   document.addEventListener("mousedown", (e) => {
     if (filterOpen && !elBrowseFilterWrap.contains(e.target)) setFilterOpen(false);
