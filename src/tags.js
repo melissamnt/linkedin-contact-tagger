@@ -88,6 +88,16 @@ export function collectTagCounts(records) {
   return [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
+// Order for the Tag manager: "count" (most used first, then A–Z), "az" or "za".
+export function sortTagCounts(counts, mode) {
+  const byName = (a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+  const sorted = [...counts];
+  if (mode === "az") sorted.sort(byName);
+  else if (mode === "za") sorted.sort((a, b) => byName(b, a));
+  else sorted.sort((a, b) => b.count - a.count || byName(a, b));
+  return sorted;
+}
+
 /* ---------- Known tags (autocomplete) ---------- */
 
 function recordTime(record) {

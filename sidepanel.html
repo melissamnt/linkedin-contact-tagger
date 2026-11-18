@@ -15,7 +15,15 @@
       <span class="brand-name">Contact<span class="brand-accent">Tagger</span></span>
     </div>
     <div class="topbar-actions">
-      <button id="browseToggle" class="icon-btn" type="button" aria-label="Browse by tag" title="Browse by tag">
+      <button id="browseToggle" class="icon-btn" type="button" aria-label="Browse people by tag" title="Browse people by tag">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="8" r="3.5"></circle>
+          <path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"></path>
+          <path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"></path>
+          <path d="M18 13.8c2.1.8 3.5 3 3.5 6.2"></path>
+        </svg>
+      </button>
+      <button id="tagManagerToggle" class="icon-btn" type="button" aria-label="Tag manager" title="Tag manager">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20.59 13.41 12 22 2 12V4a2 2 0 0 1 2-2h8l8.59 8.59a2 2 0 0 1 0 2.82Z"></path>
           <circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"></circle>
@@ -129,15 +137,30 @@
     </section>
 
     <section id="browseView" class="view" hidden>
-      <h2 class="settings-title">Browse by tag</h2>
+      <h2 class="settings-title">Browse people by tag</h2>
 
       <div class="tag-cloud" id="tagCloud"></div>
-      <div class="tag-editor" id="tagEditor" hidden></div>
 
       <div class="browse-list" id="browseList"></div>
       <p id="browseEmpty" class="empty-text browse-empty" hidden>No connections tagged yet.</p>
 
       <button id="browseBackBtn" class="link-btn" type="button">&larr; Back</button>
+    </section>
+
+    <section id="tagManagerView" class="view" hidden>
+      <h2 class="settings-title">Tag manager</h2>
+
+      <div class="tm-sort" id="tagManagerSort" role="radiogroup" aria-label="Sort tags">
+        <span class="tm-sort-label">Sort</span>
+        <button type="button" role="radio" data-sort="count">Most used</button>
+        <button type="button" role="radio" data-sort="az">A–Z</button>
+        <button type="button" role="radio" data-sort="za">Z–A</button>
+      </div>
+
+      <div class="tm-list" id="tagManagerList"></div>
+      <p id="tagManagerEmpty" class="empty-text browse-empty" hidden>No tags yet.</p>
+
+      <button id="tagManagerBackBtn" class="link-btn" type="button">&larr; Back</button>
     </section>
 
   </main>

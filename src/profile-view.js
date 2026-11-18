@@ -52,7 +52,7 @@ let currentTags = [];
 let currentAddedAt = null; // ISO date the record was first saved; null until saved once
 let currentStatus = ""; // "" | "Keep" | "Unsure" | "Remove" — the accepted, saveable value
 let pendingSuggestion = null; // { status, rationale } — an AI suggestion not yet accepted
-let viewBeforeOverlay = "empty"; // "profile" | "empty" — where Settings/Browse should return to
+let viewBeforeOverlay = "empty"; // "profile" | "empty" — where Settings/Browse/Tag manager return to
 let loadToken = 0; // guards against stale async responses after fast tab switches
 let formDirty = false; // true once the user edits tags/note/status after the form was loaded or saved
 
@@ -115,7 +115,7 @@ function addTag(raw) {
   renderTagSuggestions();
 }
 
-// A tag was renamed (or recolored) in Browse: update the open contact and any
+// A tag was renamed (or recolored) in the Tag manager: update the open contact and any
 // unsaved drafts so they don't keep — or later re-save — the old name.
 // Doesn't mark the form dirty: the rename is already saved everywhere.
 export function applyTagRename(from, to) {
@@ -452,7 +452,7 @@ export async function refreshForActiveTab() {
   }
 }
 
-// Back button of Settings / Browse: return to where the user was, then
+// Back button of Settings / Browse / Tag manager: return to where the user was, then
 // re-check the active tab (it may have changed while the overlay was open).
 export function returnFromOverlay() {
   showView(viewBeforeOverlay);

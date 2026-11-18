@@ -888,47 +888,100 @@ main {
   white-space: nowrap;
 }
 
-.tag-edit-btn {
+/* Browse chips are a single filter button now. */
+.tag-chip-plain {
+  padding: 7px 14px;
+}
+
+/* ---------- Tag manager ---------- */
+
+.tm-sort {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+}
+
+.tm-sort-label {
+  color: var(--ink-faint);
+}
+
+.tm-sort button {
+  padding: 2px 0;
+  background: none;
+  border: none;
+  border-bottom: 1.5px solid transparent;
+  color: var(--ink-muted);
+}
+
+.tm-sort button[aria-checked="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.tm-sort button:focus-visible,
+.tm-edit:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+.tm-list {
+  border-top: 1px solid var(--border);
+}
+
+.tm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+}
+
+.tm-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-count {
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.tm-edit {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: none;
-  width: 18px;
-  height: 18px;
+  width: 26px;
+  height: 26px;
   padding: 0;
-  border: none;
   background: none;
-  color: inherit;
-  opacity: 0.6;
-  transition: opacity var(--dur) var(--ease);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--ink-faint);
 }
 
-.tag-edit-btn svg {
-  width: 12px;
-  height: 12px;
+.tm-edit svg {
+  width: 14px;
+  height: 14px;
 }
 
-.tag-edit-btn:hover {
-  opacity: 1;
+.tm-edit:hover,
+.tm-edit[aria-expanded="true"] {
+  color: var(--ink);
 }
 
-.tag-edit-btn:focus-visible {
-  outline: 2px solid var(--accent-ring);
-  outline-offset: 2px;
-  border-radius: 50%;
-}
-
-/* Rename / recolor a tag, opened from the pencil on its chip. */
+/* Rename / recolor a tag, opened under its row in the Tag manager. */
 .tag-editor {
-  margin: -8px 0 22px;
+  margin: 8px 0;
   padding: 14px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-}
-
-.tag-editor[hidden] {
-  display: none;
 }
 
 .tag-editor-color-label {

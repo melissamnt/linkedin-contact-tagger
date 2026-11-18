@@ -15,6 +15,7 @@ import {
   renameTagInList,
   setKnownTagsFromRecords,
   setTagColorOverride,
+  sortTagCounts,
   tagColorClass,
   tagColorIndex,
   validateTagName,
@@ -137,4 +138,18 @@ test("renameKnownTag: renamed in place in the autocomplete list", () => {
   ]);
   renameKnownTag("start-up", "Startup");
   assert.deepEqual(getKnownTags(), ["Tech", "Startup"]);
+});
+
+test("sortTagCounts: most used (ties A–Z), A–Z and Z–A ignoring capitals", () => {
+  const counts = [
+    { label: "tech", count: 2 },
+    { label: "Art", count: 1 },
+    { label: "SF", count: 3 },
+    { label: "design", count: 2 },
+  ];
+  const labels = (mode) => sortTagCounts(counts, mode).map((t) => t.label);
+  assert.deepEqual(labels("count"), ["SF", "design", "tech", "Art"]);
+  assert.deepEqual(labels("az"), ["Art", "design", "SF", "tech"]);
+  assert.deepEqual(labels("za"), ["tech", "SF", "design", "Art"]);
+  assert.deepEqual(counts.map((t) => t.label), ["tech", "Art", "SF", "design"], "input not mutated");
 });
