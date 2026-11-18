@@ -15,7 +15,13 @@
       <span class="brand-name">Contact<span class="brand-accent">Tagger</span></span>
     </div>
     <div class="topbar-actions">
-      <button id="browseToggle" class="icon-btn" type="button" aria-label="Browse by tag" title="Browse by tag">
+      <button id="browseToggle" class="icon-btn" type="button" aria-label="Browse people" title="Browse people">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20.5 20.5-4.5-4.5"></path>
+        </svg>
+      </button>
+      <button id="tagManagerToggle" class="icon-btn" type="button" aria-label="Tag manager" title="Tag manager">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20.59 13.41 12 22 2 12V4a2 2 0 0 1 2-2h8l8.59 8.59a2 2 0 0 1 0 2.82Z"></path>
           <circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"></circle>
@@ -96,7 +102,10 @@
     </section>
 
     <section id="settingsView" class="view" hidden>
-      <h2 class="settings-title">Settings</h2>
+      <div class="view-head">
+        <h2 class="settings-title">Settings</h2>
+        <button id="backBtn" class="link-btn back-btn" type="button">&larr; Back</button>
+      </div>
       <p class="settings-help">Paste the Web App URL and secret token from your Apps Script deployment. These stay on this device only.</p>
 
       <div class="field">
@@ -125,18 +134,46 @@
         </span>
       </div>
 
-      <button id="backBtn" class="link-btn" type="button">&larr; Back</button>
     </section>
 
     <section id="browseView" class="view" hidden>
-      <h2 class="settings-title">Browse by tag</h2>
+      <div class="view-head">
+        <h2 class="settings-title">Browse people</h2>
+        <button id="browseBackBtn" class="link-btn back-btn" type="button">&larr; Back</button>
+      </div>
 
-      <div class="tag-cloud" id="tagCloud"></div>
+      <p class="loader" id="browseLoading" role="status" hidden><span class="spinner" aria-hidden="true"></span>Loading your connections…</p>
+
+      <div class="browse-filter-wrap" id="browseFilterWrap">
+        <button type="button" class="tag-suggestion tag-suggestion-all filter-btn" id="browseFilterBtn" aria-expanded="false" aria-controls="browseFilter">
+          Filter tags <span class="filter-btn-summary" id="browseFilterSummary"></span>
+        </button>
+        <div class="tag-list" id="browseFilter" role="group" aria-label="Filter by tag" hidden></div>
+      </div>
 
       <div class="browse-list" id="browseList"></div>
       <p id="browseEmpty" class="empty-text browse-empty" hidden>No connections tagged yet.</p>
 
-      <button id="browseBackBtn" class="link-btn" type="button">&larr; Back</button>
+    </section>
+
+    <section id="tagManagerView" class="view" hidden>
+      <div class="view-head">
+        <h2 class="settings-title">Tag manager</h2>
+        <button id="tagManagerBackBtn" class="link-btn back-btn" type="button">&larr; Back</button>
+      </div>
+
+      <p class="loader" id="tagManagerLoading" role="status" hidden><span class="spinner" aria-hidden="true"></span>Loading your tags…</p>
+
+      <div class="tm-sort" id="tagManagerSort" role="radiogroup" aria-label="Sort tags">
+        <span class="tm-sort-label">Sort</span>
+        <button type="button" role="radio" data-sort="count">Most used</button>
+        <button type="button" role="radio" data-sort="az">A–Z</button>
+        <button type="button" role="radio" data-sort="za">Z–A</button>
+      </div>
+
+      <div class="tm-list" id="tagManagerList"></div>
+      <p id="tagManagerEmpty" class="empty-text browse-empty" hidden>No tags yet.</p>
+
     </section>
 
   </main>

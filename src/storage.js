@@ -1,6 +1,7 @@
 /* chrome.storage.local helpers: settings, profile records, cached suggestions. */
 
 import { extractProfileUrl } from "./profile-url.js";
+import { renameTagInList } from "./tags.js";
 
 function profileKey(url) {
   return `profile:${url}`;
@@ -75,5 +76,15 @@ export async function markSynced(record) {
   const local = await getLocalRecord(record.profileUrl);
   if (local && local.updatedAt === record.updatedAt) {
     await setLocalRecord({ ...local, pendingSync: false });
+  }
+}
+
+// Renames a tag on every locally stored record. updatedAt and pendingSync
+// are kept: an unsynced save still gets pushed later, now with the new name.
+export async function renameTagInLocalRecords(from, to) {
+  const fromKey = from.toLowerCase();
+  for (const record of await getAllLocalRecords()) {
+    if (!(record.tags || []).some((t) => t.toLowerCase() === fromKey)) continue;
+    await setLocalRecord({ ...record, tags: renameTagInList(record.tags, from, to) });
   }
 }

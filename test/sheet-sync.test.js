@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SETTINGS, installFakeChrome, installFakeFetch } from "./helpers/fakes.js";
-import { fetchAllRecords, fetchRemote, mergeWithLocal, pushRemote } from "../src/sheet-sync.js";
+import { fetchAllRecords, fetchRemote, mergeWithLocal, pushRemote, renameTagRemote } from "../src/sheet-sync.js";
 
 const URL_A = "https://www.linkedin.com/in/juan-perez/";
 
@@ -86,4 +86,24 @@ test("fetchAllRecords: Sheet records merged with unsynced local ones", async () 
 
   assert.equal(source, "remote");
   assert.deepEqual(records.map((r) => r.profileUrl).sort(), [URL_A, "https://www.linkedin.com/in/luis/"]);
+});
+
+test("renameTagRemote: one text/plain POST with the renameTag action", async () => {
+  installFakeChrome(SETTINGS);
+  const calls = installFakeFetch(() => ({ body: { ok: true, updated: 3 } }));
+  assert.deepEqual(await renameTagRemote("start-up", "Startup"), { configured: true, updated: 3 });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].options.headers["Content-Type"], "text/plain;charset=utf-8");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { action: "renameTag", from: "start-up", to: "Startup", token: "s3cret" });
+});
+
+test("renameTagRemote: explains an out-of-date Apps Script; not configured sends nothing", async () => {
+  installFakeChrome(SETTINGS);
+  installFakeFetch(() => ({ body: { ok: false, error: "Missing profileUrl" } }));
+  await assert.rejects(renameTagRemote("a", "b"), /Apps Script is out of date/);
+
+  installFakeChrome();
+  const calls = installFakeFetch(() => ({}));
+  assert.deepEqual(await renameTagRemote("a", "b"), { configured: false });
+  assert.equal(calls.length, 0);
 });

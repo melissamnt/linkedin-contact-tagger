@@ -8,6 +8,7 @@ import {
   getLocalRecord,
   getSettings,
   markSynced,
+  renameTagInLocalRecords,
   setCachedSuggestion,
   setLocalRecord,
 } from "../src/storage.js";
@@ -69,4 +70,14 @@ test("cached suggestions: set, get and clear", async () => {
   assert.deepEqual(await getCachedSuggestion(URL_A), { status: "Keep", rationale: "Works in your field" });
   await clearCachedSuggestion(URL_A);
   assert.equal(await getCachedSuggestion(URL_A), null);
+});
+
+test("renameTagInLocalRecords: renames everywhere, keeps updatedAt and pendingSync", async () => {
+  const store = installFakeChrome({
+    [`profile:${URL_A}`]: { profileUrl: URL_A, tags: ["SF", "start-up"], updatedAt: "t1", pendingSync: true },
+    "profile:https://www.linkedin.com/in/b/": { profileUrl: "https://www.linkedin.com/in/b/", tags: ["Design"], updatedAt: "t2" },
+  });
+  await renameTagInLocalRecords("Start-Up", "Startup");
+  assert.deepEqual(store[`profile:${URL_A}`], { profileUrl: URL_A, tags: ["SF", "Startup"], updatedAt: "t1", pendingSync: true });
+  assert.deepEqual(store["profile:https://www.linkedin.com/in/b/"].tags, ["Design"]);
 });

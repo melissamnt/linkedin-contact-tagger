@@ -5,15 +5,21 @@ import {
   TAG_COLOR_COUNT,
   collectRecentTags,
   collectTagCounts,
+  filterRecordsByTags,
   filterTags,
   getKnownTags,
   listAllTags,
   loadTagColorOverrides,
   markTagsUsed,
+  renameKnownTag,
+  renameTagColor,
+  renameTagInList,
   setKnownTagsFromRecords,
   setTagColorOverride,
+  sortTagCounts,
   tagColorClass,
   tagColorIndex,
+  validateTagName,
 } from "../src/tags.js";
 
 beforeEach(async () => {
@@ -101,4 +107,64 @@ test("listAllTags: every tag A–Z, applied ones flagged, filtered by query", ()
     { tag: "Tech", selected: false },
   ]);
   assert.deepEqual(listAllTags(known, ["Startup"], "STAR"), [{ tag: "Startup", selected: true }]);
+});
+
+test("validateTagName: empty, commas and existing names refused; capitals-only change allowed", () => {
+  const existing = ["Startup", "Tech"];
+  assert.equal(validateTagName("  ", "Tech", existing), "Name can't be empty.");
+  assert.equal(validateTagName("a, b", "Tech", existing), "Tag names can't contain commas.");
+  assert.equal(validateTagName("startup", "Tech", existing), '"startup" already exists.');
+  assert.equal(validateTagName("TECH", "Tech", existing), null);
+  assert.equal(validateTagName(" Fintech ", "Tech", existing), null);
+});
+
+test("renameTagInList: replaces any capitals, no duplicates", () => {
+  assert.deepEqual(renameTagInList(["SF", "start-up"], "Start-Up", "Startup"), ["SF", "Startup"]);
+  assert.deepEqual(renameTagInList(["startup", "Startup"], "startup", "Startup"), ["Startup"]);
+  assert.deepEqual(renameTagInList(["SF"], "Tech", "X"), ["SF"]);
+});
+
+test("renameTagColor: new name keeps the chosen color, old override dropped", async () => {
+  const store = installFakeChrome({ tagColors: { "start-up": 2 } });
+  await loadTagColorOverrides();
+  await renameTagColor("start-up", "Startup", 2);
+  assert.deepEqual(store.tagColors, { startup: 2 });
+  assert.equal(tagColorIndex("Startup"), 2);
+});
+
+test("renameKnownTag: renamed in place in the autocomplete list", () => {
+  setKnownTagsFromRecords([
+    { tags: ["Tech"], updatedAt: "2026-02-01T00:00:00Z" },
+    { tags: ["start-up"], updatedAt: "2026-01-01T00:00:00Z" },
+  ]);
+  renameKnownTag("start-up", "Startup");
+  assert.deepEqual(getKnownTags(), ["Tech", "Startup"]);
+});
+
+test("sortTagCounts: most used (ties A–Z), A–Z and Z–A ignoring capitals", () => {
+  const counts = [
+    { label: "tech", count: 2 },
+    { label: "Art", count: 1 },
+    { label: "SF", count: 3 },
+    { label: "design", count: 2 },
+  ];
+  const labels = (mode) => sortTagCounts(counts, mode).map((t) => t.label);
+  assert.deepEqual(labels("count"), ["SF", "design", "tech", "Art"]);
+  assert.deepEqual(labels("az"), ["Art", "design", "SF", "tech"]);
+  assert.deepEqual(labels("za"), ["tech", "SF", "design", "Art"]);
+  assert.deepEqual(counts.map((t) => t.label), ["tech", "Art", "SF", "design"], "input not mutated");
+});
+
+test("filterRecordsByTags: All shows everyone; otherwise anyone with a checked tag", () => {
+  const records = [
+    { name: "A", tags: ["SF", "Tech"] },
+    { name: "B", tags: ["design"] },
+    { name: "C", tags: [] },
+    { name: "D" },
+  ];
+  const names = (all, sel) => filterRecordsByTags(records, all, new Set(sel)).map((r) => r.name);
+  assert.deepEqual(names(true, []), ["A", "B", "C", "D"]);
+  assert.deepEqual(names(false, ["tech", "design"]), ["A", "B"]); // untagged hidden once All is off
+  assert.deepEqual(names(false, ["design"]), ["B"]);
+  assert.deepEqual(names(false, []), []);
 });

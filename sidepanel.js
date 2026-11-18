@@ -8,23 +8,27 @@
  *   tags.js          tag colors, counts, autocomplete (recent order + filter)
  *   dom.js           element references + shared view helpers
  *   profile-view.js  the profile form (tags, note, status, save, suggest)
- *   browse-view.js   browse-by-tag view
+ *   browse-view.js   browse people (tag checklist filter)
+ *   tag-manager-view.js  tag manager: sort, rename, recolor
  *   settings-view.js settings view
  */
 
-import { elBackBtn, elBrowseBackBtn } from "./src/dom.js";
+import { elBackBtn, elBrowseBackBtn, elTagManagerBackBtn } from "./src/dom.js";
 import { getSettings } from "./src/storage.js";
 import { loadTagColorOverrides } from "./src/tags.js";
 import { initProfileView, refreshForActiveTab, refreshKnownTags, returnFromOverlay } from "./src/profile-view.js";
 import { initBrowseView } from "./src/browse-view.js";
+import { initTagManagerView } from "./src/tag-manager-view.js";
 import { applySuggestAvailability, initSettingsView } from "./src/settings-view.js";
 
 initProfileView();
 initBrowseView();
+initTagManagerView();
 initSettingsView();
 
 elBackBtn.addEventListener("click", returnFromOverlay);
 elBrowseBackBtn.addEventListener("click", returnFromOverlay);
+elTagManagerBackBtn.addEventListener("click", returnFromOverlay);
 
 /* ---------- Tab change listeners ---------- */
 

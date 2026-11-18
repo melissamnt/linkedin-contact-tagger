@@ -6,6 +6,7 @@ export const elProfileView = $("profileView");
 export const elEmptyView = $("emptyView");
 export const elSettingsView = $("settingsView");
 export const elBrowseView = $("browseView");
+export const elTagManagerView = $("tagManagerView");
 
 // Profile view
 export const elProfileName = $("profileName");
@@ -37,22 +38,35 @@ export const elClaudeApiKey = $("claudeApiKey");
 export const elSaveSettingsBtn = $("saveSettingsBtn");
 export const elSettingsSavedConfirm = $("settingsSavedConfirm");
 
-// Browse view
+// Browse people
 export const elBrowseToggle = $("browseToggle");
-export const elTagCloud = $("tagCloud");
+export const elBrowseLoading = $("browseLoading");
+export const elBrowseFilterWrap = $("browseFilterWrap");
+export const elBrowseFilterBtn = $("browseFilterBtn");
+export const elBrowseFilterSummary = $("browseFilterSummary");
+export const elBrowseFilter = $("browseFilter");
 export const elBrowseList = $("browseList");
 export const elBrowseEmpty = $("browseEmpty");
 export const elBrowseBackBtn = $("browseBackBtn");
+
+// Tag manager
+export const elTagManagerToggle = $("tagManagerToggle");
+export const elTagManagerLoading = $("tagManagerLoading");
+export const elTagManagerSort = $("tagManagerSort");
+export const elTagManagerList = $("tagManagerList");
+export const elTagManagerEmpty = $("tagManagerEmpty");
+export const elTagManagerBackBtn = $("tagManagerBackBtn");
 
 export function showView(name) {
   elProfileView.hidden = name !== "profile";
   elEmptyView.hidden = name !== "empty";
   elSettingsView.hidden = name !== "settings";
   elBrowseView.hidden = name !== "browse";
+  elTagManagerView.hidden = name !== "tagManager";
 }
 
 export function isOverlayOpen() {
-  return !elSettingsView.hidden || !elBrowseView.hidden;
+  return !elSettingsView.hidden || !elBrowseView.hidden || !elTagManagerView.hidden;
 }
 
 export function flashSavedConfirm(el) {

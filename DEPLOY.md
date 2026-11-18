@@ -22,6 +22,8 @@ Two parts: a Google Sheet + Apps Script backend, and the Chrome extension itself
    - Copy the **Web app URL** it gives you (ends in `/exec`). You'll paste this into the extension.
 7. The sheet will get a "Connections" tab with headers the first time you save a profile from the extension — you don't need to create it by hand.
 
+**Updating to rename tags:** editing a tag's name in the **Tag manager** needs the `renameTag` action added to `Code.gs` in November 2026. If you set up the Sheet before that, paste the latest `Code.gs` over yours and re-deploy as below. Until you do, renaming shows an error and nothing changes; colors work either way.
+
 **Re-deploying after edits:** if you ever change `Code.gs`, use **Deploy > Manage deployments > Edit (pencil) > New version** so the same `/exec` URL picks up your changes.
 
 ## 2. Install the Chrome extension

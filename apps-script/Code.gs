@@ -30,6 +30,10 @@ function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
     checkToken(body.token);
+    if (body.action === "renameTag") {
+      var updated = renameTag(body.from, body.to);
+      return jsonOutput({ ok: true, updated: updated });
+    }
     var record = upsertRecord(body);
     return jsonOutput({ ok: true, record: record });
   } catch (err) {
@@ -164,16 +168,72 @@ function upsertRecordLocked(profileUrl, body) {
   return rowToRecord(row);
 }
 
+/**
+ * Renames a tag on every row in one pass (case-insensitive match).
+ * Refuses a new name that another tag already uses — only a change of
+ * capitals of the same tag is allowed. updated_at is left alone: renaming
+ * a tag isn't an edit of the contact. Returns how many rows changed.
+ */
+function renameTag(from, to) {
+  from = String(from || "").trim();
+  to = String(to || "").trim();
+  if (!from || !to) throw new Error("Missing tag name");
+  if (to.indexOf(",") !== -1) throw new Error("Tag names can't contain commas");
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sheet = getSheet();
+    var values = sheet.getDataRange().getValues();
+    var fromKey = from.toLowerCase();
+    var toKey = to.toLowerCase();
+
+    if (toKey !== fromKey) {
+      for (var r = 1; r < values.length; r++) {
+        if (splitTags(values[r][2]).some(function (t) { return t.toLowerCase() === toKey; })) {
+          throw new Error('Tag "' + to + '" already exists');
+        }
+      }
+    }
+
+    var updated = 0;
+    for (var i = 1; i < values.length; i++) {
+      if (!values[i][0]) continue;
+      var tags = splitTags(values[i][2]);
+      if (!tags.some(function (t) { return t.toLowerCase() === fromKey; })) continue;
+      var renamed = [];
+      var seen = {};
+      tags.forEach(function (t) {
+        var next = t.toLowerCase() === fromKey ? to : t;
+        if (seen[next.toLowerCase()]) return;
+        seen[next.toLowerCase()] = true;
+        renamed.push(next);
+      });
+      var cell = sheet.getRange(i + 1, 3, 1, 1);
+      cell.setNumberFormat("@");
+      cell.setValues([[renamed.join(", ")]]);
+      updated++;
+    }
+    return updated;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function splitTags(value) {
+  return value
+    ? String(value)
+        .split(",")
+        .map(function (t) { return t.trim(); })
+        .filter(Boolean)
+    : [];
+}
+
 function rowToRecord(row) {
   return {
     profileUrl: row[0],
     name: row[1],
-    tags: row[2]
-      ? String(row[2])
-          .split(",")
-          .map(function (t) { return t.trim(); })
-          .filter(Boolean)
-      : [],
+    tags: splitTags(row[2]),
     note: row[3],
     status: row[4],
     updatedAt: row[5],
