@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest a new feature or an improvement
+title: "[Feature] "
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! This repo is **public** — please don't include real contact names, LinkedIn URLs, your Sheet link or tokens. Use made-up examples like "Jane Doe".
+  - type: textarea
+    id: what
+    attributes:
+      label: What would you like?
+      description: Describe the feature in a sentence or two.
+      placeholder: e.g. Sort Browse people by name.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why?
+      description: What problem does it solve, or what would it make easier?
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot or sketch (optional)
+      description: Paste or drag an image here if it helps explain.
