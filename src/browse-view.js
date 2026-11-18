@@ -11,7 +11,7 @@ import {
   showView,
 } from "./dom.js";
 import { fetchAllRecords } from "./sheet-sync.js";
-import { collectTagCounts, filterRecordsByTags, setKnownTagsFromRecords, tagColorClass, tagStripeClass } from "./tags.js";
+import { collectTagCounts, filterRecordsByTags, setKnownTagsFromRecords, tagColorClass } from "./tags.js";
 
 let browseRecords = [];
 // "All" checked = everyone, tagged or not. Unchecking a tag unchecks All too,
@@ -163,9 +163,6 @@ function renderBrowseList() {
     const row = document.createElement("button");
     row.type = "button";
     row.className = "browse-row";
-    if (record.tags && record.tags.length) {
-      row.classList.add(tagStripeClass(record.tags[0]));
-    }
 
     const main = document.createElement("div");
     main.className = "browse-row-main";
@@ -183,9 +180,15 @@ function renderBrowseList() {
     row.appendChild(main);
 
     if (record.tags && record.tags.length) {
+      // every tag as a small chip in its own color
       const tags = document.createElement("div");
       tags.className = "browse-row-tags";
-      tags.textContent = record.tags.join(" · ");
+      for (const tag of record.tags) {
+        const chip = document.createElement("span");
+        chip.className = `browse-tag ${tagColorClass(tag)}`;
+        chip.textContent = tag;
+        tags.appendChild(chip);
+      }
       row.appendChild(tags);
     }
 

@@ -40,10 +40,6 @@ export function tagColorClass(tag) {
   return `tag-color-${tagColorIndex(tag)}`;
 }
 
-export function tagStripeClass(tag) {
-  return `tag-stripe-${tagColorIndex(tag)}`;
-}
-
 /* ---------- Renaming ---------- */
 
 // Why `to` can't replace `from`, or null if it can. `existing` is every tag
