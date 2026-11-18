@@ -36,6 +36,16 @@ apps-script/Code.gs    Google Apps Script backend (doGet/doPost)
 fonts/, icons/         Bundled assets (no external font/CDN requests)
 ```
 
+## Tests
+
+Unit tests use Node's built-in test runner — no dependencies to install. With Node 22 or newer:
+
+```bash
+npm test
+```
+
+They cover the modules in `src/` (with in-memory fakes for `chrome.storage` and `fetch`) and `apps-script/Code.gs` (run in a sandbox with fake Google services), including a check that both sides canonicalize profile URLs the same way. The side panel UI itself is still tested by hand in Chrome. CI runs the tests on every pull request.
+
 ## Privacy
 
 Your Apps Script Web App URL, secret token, and Claude API key are stored only in `chrome.storage.local` on your machine — nothing is hardcoded in the source, and nothing is sent anywhere except your own Apps Script deployment and (if configured) the Claude API directly from your browser.
