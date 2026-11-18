@@ -65,10 +65,28 @@ function getSheet() {
   return sheet;
 }
 
+/**
+ * Canonical profile URL — must match extractProfileUrl() in sidepanel.js:
+ * decoded, lowercased, re-encoded slug. Lets rows saved before the client
+ * canonicalized URLs (e.g. "/in/Juan-Perez/") still match "/in/juan-perez/".
+ */
+function normalizeProfileUrl(url) {
+  var match = String(url || "").match(/\/in\/([^\/?#]+)/);
+  if (!match) return String(url || "");
+  var slug;
+  try {
+    slug = encodeURIComponent(decodeURIComponent(match[1]).toLowerCase());
+  } catch (err) {
+    slug = match[1].toLowerCase(); // malformed escape — don't double-encode it
+  }
+  return "https://www.linkedin.com/in/" + slug + "/";
+}
+
 function findRowIndex(sheet, profileUrl) {
+  var needle = normalizeProfileUrl(profileUrl);
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
-    if (values[i][0] === profileUrl) return i + 1; // 1-based sheet row
+    if (values[i][0] && normalizeProfileUrl(values[i][0]) === needle) return i + 1; // 1-based sheet row
   }
   return -1;
 }
@@ -100,9 +118,21 @@ function listRecords(tagFilter) {
 }
 
 function upsertRecord(body) {
-  var profileUrl = body.profileUrl;
-  if (!profileUrl) throw new Error("Missing profileUrl");
+  if (!body.profileUrl) throw new Error("Missing profileUrl");
+  var profileUrl = normalizeProfileUrl(body.profileUrl);
 
+  // Two near-simultaneous saves of the same profile could both miss
+  // findRowIndex and append duplicate rows — serialize writes.
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    return upsertRecordLocked(profileUrl, body);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function upsertRecordLocked(profileUrl, body) {
   var sheet = getSheet();
   var updatedAt = body.updatedAt || new Date().toISOString();
   var tags = Array.isArray(body.tags) ? body.tags.join(", ") : String(body.tags || "");
@@ -113,18 +143,24 @@ function upsertRecord(body) {
   // existing value always wins over whatever the client sends, so clock
   // skew or a stale client payload can never overwrite the true add date.
   var addedAt = body.addedAt || new Date().toISOString();
+  var name = body.name || "";
   if (rowIndex !== -1) {
     var existing = sheet.getRange(rowIndex, 1, 1, HEADERS.length).getValues()[0];
     if (existing[6]) addedAt = existing[6];
+    // An empty name from the client (tab title not loaded yet) must not
+    // erase the name already stored.
+    if (!name && existing[1]) name = existing[1];
   }
 
-  var row = [profileUrl, body.name || "", tags, body.note || "", body.status || "", updatedAt, addedAt];
+  var row = [profileUrl, name, tags, body.note || "", body.status || "", updatedAt, addedAt];
 
-  if (rowIndex === -1) {
-    sheet.appendRow(row);
-  } else {
-    sheet.getRange(rowIndex, 1, 1, HEADERS.length).setValues([row]);
-  }
+  // Write the row as plain text ("@") so Sheets doesn't reinterpret values:
+  // a note starting with "=" stays text instead of becoming a formula, and
+  // "3/4" or "2024" stay strings instead of turning into dates/numbers.
+  var targetRow = rowIndex === -1 ? sheet.getLastRow() + 1 : rowIndex;
+  var range = sheet.getRange(targetRow, 1, 1, HEADERS.length);
+  range.setNumberFormat("@");
+  range.setValues([row.map(function (v) { return v instanceof Date ? v.toISOString() : String(v); })]);
   return rowToRecord(row);
 }
 
