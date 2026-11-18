@@ -1,0 +1,12 @@
+{
+  "name": "linkedin-contact-tagger",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only manifest for running tests. Chrome ignores this file.",
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
