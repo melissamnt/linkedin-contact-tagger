@@ -107,6 +107,7 @@ function addTag(raw) {
 export async function refreshKnownTags() {
   const { records } = await fetchAllRecords();
   setKnownTagsFromRecords(records);
+  renderTagSuggestions();
 }
 
 const SUGGESTION_LIMIT = 8;
@@ -125,9 +126,13 @@ function pickTagOnMousedown(btn, tag) {
   });
 }
 
+let suggestionsActive = false; // the tag input is focused: show suggestion chips (the All tags button shows regardless)
+
 function openAllTags() {
   allTagsOpen = true;
+  suggestionsActive = true;
   renderTagSuggestions();
+  elTagsInput.focus(); // so typing filters the list, even if it was opened with the input unfocused
 }
 
 function closeAllTags() {
@@ -135,10 +140,11 @@ function closeAllTags() {
   renderTagSuggestions();
 }
 
+// Input blurred or Escape: drop the chips and the list, keep the All tags button.
 function hideTagMenus() {
   allTagsOpen = false;
-  elTagSuggestions.hidden = true;
-  elTagList.hidden = true;
+  suggestionsActive = false;
+  renderTagSuggestions();
 }
 
 function renderTagSuggestions() {
@@ -150,30 +156,29 @@ function renderTagSuggestions() {
 function renderTopSuggestions(matches) {
   elTagList.hidden = true;
   elTagSuggestions.innerHTML = "";
-  elTagSuggestions.hidden = matches.length === 0;
+  elTagSuggestions.hidden = false; // never hidden: it always holds the All tags button
 
-  for (const tag of matches.slice(0, SUGGESTION_LIMIT)) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "tag-suggestion";
-    btn.textContent = tag;
-    pickTagOnMousedown(btn, tag);
-    elTagSuggestions.appendChild(btn);
+  if (suggestionsActive) {
+    for (const tag of matches.slice(0, SUGGESTION_LIMIT)) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "tag-suggestion";
+      btn.textContent = tag;
+      pickTagOnMousedown(btn, tag);
+      elTagSuggestions.appendChild(btn);
+    }
   }
 
-  // Always offered next to the suggestions (the row itself only shows when
-  // something matches), so the full list is one click away.
-  if (matches.length) {
-    const more = document.createElement("button");
-    more.type = "button";
-    more.className = "tag-suggestion tag-suggestion-all";
-    more.textContent = `All tags (${matches.length})`;
-    more.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      openAllTags();
-    });
-    elTagSuggestions.appendChild(more);
-  }
+  // Always there — focused or not, matches or not — so the full list is one click away.
+  const all = document.createElement("button");
+  all.type = "button";
+  all.className = "tag-suggestion tag-suggestion-all";
+  all.textContent = "All tags";
+  all.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    openAllTags();
+  });
+  elTagSuggestions.appendChild(all);
 }
 
 function renderAllTagsList(matches) {
@@ -271,6 +276,7 @@ function setCurrentName(name) {
 function applyRecordToForm(record) {
   currentTags = record?.tags ? [...record.tags] : [];
   renderChips();
+  renderTagSuggestions();
   elNoteInput.value = record?.note || "";
   setStatus(record?.status || "");
   currentAddedAt = record?.addedAt || null;
@@ -288,6 +294,7 @@ function restoreDraft(url) {
   if (!draft) return false;
   currentTags = [...draft.tags];
   renderChips();
+  renderTagSuggestions();
   elNoteInput.value = draft.note;
   setStatus(draft.status);
   formDirty = true; // still unsaved — and keeps remote data from overwriting it
@@ -522,9 +529,15 @@ export function initProfileView() {
     }
   });
 
-  elTagsInput.addEventListener("input", renderTagSuggestions);
+  elTagsInput.addEventListener("input", () => {
+    suggestionsActive = true; // typing after Escape brings the chips back
+    renderTagSuggestions();
+  });
   elNoteInput.addEventListener("input", markDirty);
-  elTagsInput.addEventListener("focus", renderTagSuggestions);
+  elTagsInput.addEventListener("focus", () => {
+    suggestionsActive = true;
+    renderTagSuggestions();
+  });
 
   elTagsInput.addEventListener("blur", () => {
     if (elTagsInput.value.trim()) {
