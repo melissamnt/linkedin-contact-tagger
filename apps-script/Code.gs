@@ -34,6 +34,9 @@ function doPost(e) {
       var updated = renameTag(body.from, body.to);
       return jsonOutput({ ok: true, updated: updated });
     }
+    if (body.action === "renameFamily") {
+      return jsonOutput({ ok: true, updated: renameFamily(body.from, body.to) });
+    }
     var record = upsertRecord(body);
     return jsonOutput({ ok: true, record: record });
   } catch (err) {
@@ -218,6 +221,70 @@ function renameTag(from, to) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * Renames a tag family on every row: "Education > X" becomes "Studies > X",
+ * and the family used as a tag on its own ("Education") becomes "Studies".
+ * Refuses a new name already used by another family or tag (a change of
+ * capitals is fine). updated_at is left alone. Returns rows changed.
+ * Family parsing must match parseTag() in src/tags.js.
+ */
+function renameFamily(from, to) {
+  from = String(from || "").trim();
+  to = String(to || "").trim();
+  if (!from || !to) throw new Error("Missing family name");
+  if (to.indexOf(",") !== -1 || to.indexOf(">") !== -1) throw new Error('Family names can\'t contain "," or ">"');
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sheet = getSheet();
+    var values = sheet.getDataRange().getValues();
+    var fromKey = from.toLowerCase();
+    var toKey = to.toLowerCase();
+
+    if (toKey !== fromKey) {
+      for (var r = 1; r < values.length; r++) {
+        if (splitTags(values[r][2]).some(function (t) { return familyKey(t) === toKey; })) {
+          throw new Error('"' + to + '" already exists');
+        }
+      }
+    }
+
+    var updated = 0;
+    for (var i = 1; i < values.length; i++) {
+      if (!values[i][0]) continue;
+      var tags = splitTags(values[i][2]);
+      if (!tags.some(function (t) { return familyKey(t) === fromKey; })) continue;
+      var renamed = [];
+      var seen = {};
+      tags.forEach(function (t) {
+        var next = t;
+        if (familyKey(t) === fromKey) {
+          var cut = t.indexOf(">");
+          next = cut === -1 ? to : to + " > " + t.slice(cut + 1).trim();
+        }
+        if (seen[next.toLowerCase()]) return;
+        seen[next.toLowerCase()] = true;
+        renamed.push(next);
+      });
+      var cell = sheet.getRange(i + 1, 3, 1, 1);
+      cell.setNumberFormat("@");
+      cell.setValues([[renamed.join(", ")]]);
+      updated++;
+    }
+    return updated;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Lowercase family of a tag, or the tag itself when it has none:
+// "Education > DS4A" -> "education", "SF" -> "sf".
+function familyKey(tag) {
+  var cut = tag.indexOf(">");
+  return (cut === -1 ? tag : tag.slice(0, cut)).trim().toLowerCase();
 }
 
 function splitTags(value) {

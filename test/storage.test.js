@@ -8,6 +8,7 @@ import {
   getLocalRecord,
   getSettings,
   markSynced,
+  renameFamilyInLocalRecords,
   renameTagInLocalRecords,
   setCachedSuggestion,
   setLocalRecord,
@@ -80,4 +81,14 @@ test("renameTagInLocalRecords: renames everywhere, keeps updatedAt and pendingSy
   await renameTagInLocalRecords("Start-Up", "Startup");
   assert.deepEqual(store[`profile:${URL_A}`], { profileUrl: URL_A, tags: ["SF", "Startup"], updatedAt: "t1", pendingSync: true });
   assert.deepEqual(store["profile:https://www.linkedin.com/in/b/"].tags, ["Design"]);
+});
+
+test("renameFamilyInLocalRecords: renames the family everywhere, keeps sync flags", async () => {
+  const store = installFakeChrome({
+    [`profile:${URL_A}`]: { profileUrl: URL_A, tags: ["Education > DS4A", "SF"], updatedAt: "t1", pendingSync: true },
+    "profile:https://www.linkedin.com/in/b/": { profileUrl: "https://www.linkedin.com/in/b/", tags: ["education"], updatedAt: "t2" },
+  });
+  await renameFamilyInLocalRecords("Education", "Studies");
+  assert.deepEqual(store[`profile:${URL_A}`], { profileUrl: URL_A, tags: ["Studies > DS4A", "SF"], updatedAt: "t1", pendingSync: true });
+  assert.deepEqual(store["profile:https://www.linkedin.com/in/b/"].tags, ["Studies"]);
 });

@@ -191,3 +191,35 @@ test("doPost renameTag: allows a capitals-only change, refuses an existing name"
   assert.equal(post(gs, { token: "s3cret", action: "renameTag", from: "Tech", to: "a, b" }).error, "Tag names can't contain commas");
   assert.equal(post(gs, { token: "nope", action: "renameTag", from: "Tech", to: "X" }).error, "Unauthorized");
 });
+
+test("doPost renameFamily: renames the family on its tags and its own tag, deduplicating", () => {
+  const sheet = makeSheet([
+    HEADERS,
+    ["https://www.linkedin.com/in/a/", "A", "SF, Education > DS4A, education > Uniandes", "", "", "2025-01-01", ""],
+    ["https://www.linkedin.com/in/b/", "B", "Education", "", "", "2025-02-02", ""],
+    ["https://www.linkedin.com/in/c/", "C", "Educational, Design", "", "", "2025-03-03", ""],
+  ]);
+  const gs = loadCodeGs(sheet);
+
+  const res = post(gs, { token: "s3cret", action: "renameFamily", from: "education", to: "Studies" });
+
+  assert.deepEqual(res, { ok: true, updated: 2 });
+  assert.deepEqual(sheet.data.map((r) => r[2]), [
+    "tags",
+    "SF, Studies > DS4A, Studies > Uniandes",
+    "Studies",
+    "Educational, Design", // a different tag that only starts the same way
+  ]);
+  assert.deepEqual(sheet.data.map((r) => r[5]), ["updated_at", "2025-01-01", "2025-02-02", "2025-03-03"]);
+});
+
+test("doPost renameFamily: refuses a name in use, allows capitals, rejects separators", () => {
+  const sheet = makeSheet([HEADERS, ["https://www.linkedin.com/in/a/", "A", "education > DS4A, SF", "", "", "", ""]]);
+  const gs = loadCodeGs(sheet);
+
+  assert.equal(post(gs, { token: "s3cret", action: "renameFamily", from: "education", to: "sf" }).error, '"sf" already exists');
+  assert.equal(sheet.data[1][2], "education > DS4A, SF", "nothing changed");
+  assert.equal(post(gs, { token: "s3cret", action: "renameFamily", from: "education", to: "A > B" }).ok, false);
+  assert.equal(post(gs, { token: "s3cret", action: "renameFamily", from: "education", to: "Education" }).ok, true);
+  assert.equal(sheet.data[1][2], "Education > DS4A, SF");
+});

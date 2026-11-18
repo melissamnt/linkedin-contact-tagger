@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SETTINGS, installFakeChrome, installFakeFetch } from "./helpers/fakes.js";
-import { fetchAllRecords, fetchRemote, mergeWithLocal, pushRemote, renameTagRemote } from "../src/sheet-sync.js";
+import { fetchAllRecords, fetchRemote, mergeWithLocal, pushRemote, renameFamilyRemote, renameTagRemote } from "../src/sheet-sync.js";
 
 const URL_A = "https://www.linkedin.com/in/juan-perez/";
 
@@ -106,4 +106,11 @@ test("renameTagRemote: explains an out-of-date Apps Script; not configured sends
   const calls = installFakeFetch(() => ({}));
   assert.deepEqual(await renameTagRemote("a", "b"), { configured: false });
   assert.equal(calls.length, 0);
+});
+
+test("renameFamilyRemote: one POST with the renameFamily action", async () => {
+  installFakeChrome(SETTINGS);
+  const calls = installFakeFetch(() => ({ body: { ok: true, updated: 4 } }));
+  assert.deepEqual(await renameFamilyRemote("Education", "Studies"), { configured: true, updated: 4 });
+  assert.deepEqual(JSON.parse(calls[0].options.body), { action: "renameFamily", from: "Education", to: "Studies", token: "s3cret" });
 });

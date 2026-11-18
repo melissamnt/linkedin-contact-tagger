@@ -42,7 +42,6 @@ import {
   matchFamilySpelling,
   normalizeTag,
   parseTag,
-  renameTagInList,
   setKnownTagsFromRecords,
   tagColorClass,
   tagLabel,
@@ -125,12 +124,13 @@ function addTag(raw) {
   renderTagSuggestions();
 }
 
-// A tag was renamed (or recolored) in the Tag manager: update the open contact and any
-// unsaved drafts so they don't keep — or later re-save — the old name.
-// Doesn't mark the form dirty: the rename is already saved everywhere.
-export function applyTagRename(from, to) {
-  currentTags = renameTagInList(currentTags, from, to);
-  for (const draft of drafts.values()) draft.tags = renameTagInList(draft.tags, from, to);
+// Tags were renamed (or recolored) in the Tag manager: update the open
+// contact and any unsaved drafts so they don't keep — or later re-save — the
+// old names. `change` maps a tag list to its new form. Doesn't mark the form
+// dirty: the rename is already saved everywhere.
+export function applyTagsChange(change) {
+  currentTags = change(currentTags);
+  for (const draft of drafts.values()) draft.tags = change(draft.tags);
   renderChips();
   renderTagSuggestions();
 }

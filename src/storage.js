@@ -1,7 +1,7 @@
 /* chrome.storage.local helpers: settings, profile records, cached suggestions. */
 
 import { extractProfileUrl } from "./profile-url.js";
-import { renameTagInList } from "./tags.js";
+import { familyKeyOf, renameFamilyInList, renameTagInList } from "./tags.js";
 
 function profileKey(url) {
   return `profile:${url}`;
@@ -86,5 +86,14 @@ export async function renameTagInLocalRecords(from, to) {
   for (const record of await getAllLocalRecords()) {
     if (!(record.tags || []).some((t) => t.toLowerCase() === fromKey)) continue;
     await setLocalRecord({ ...record, tags: renameTagInList(record.tags, from, to) });
+  }
+}
+
+// Renames a tag family on every locally stored record (same rules as above).
+export async function renameFamilyInLocalRecords(from, to) {
+  const fromKey = from.toLowerCase();
+  for (const record of await getAllLocalRecords()) {
+    if (!(record.tags || []).some((t) => familyKeyOf(t) === fromKey)) continue;
+    await setLocalRecord({ ...record, tags: renameFamilyInList(record.tags, from, to) });
   }
 }
