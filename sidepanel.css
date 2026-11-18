@@ -855,6 +855,53 @@ main {
   border-radius: 4px;
 }
 
+/* Page title with Back on the right (Settings, Browse people, Tag manager). */
+.view-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.view-head .settings-title {
+  margin: 0;
+}
+
+.back-btn {
+  flex: none;
+  margin-top: 0;
+}
+
+/* Shown while a page's data loads. */
+.loader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 24px 0;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.loader[hidden] {
+  display: none;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--ink-muted);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ---------- Browse view ---------- */
 
 /* ---------- Browse people filter ---------- */
@@ -896,6 +943,10 @@ main {
   font-size: 12.5px;
 }
 
+.tm-sort[hidden] {
+  display: none;
+}
+
 .tm-sort-label {
   color: var(--ink-faint);
 }
@@ -921,6 +972,10 @@ main {
 
 .tm-list {
   border-top: 1px solid var(--border);
+}
+
+.tm-list:empty {
+  border-top: none;
 }
 
 .tm-row {

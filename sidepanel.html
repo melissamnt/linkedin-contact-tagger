@@ -102,7 +102,10 @@
     </section>
 
     <section id="settingsView" class="view" hidden>
-      <h2 class="settings-title">Settings</h2>
+      <div class="view-head">
+        <h2 class="settings-title">Settings</h2>
+        <button id="backBtn" class="link-btn back-btn" type="button">&larr; Back</button>
+      </div>
       <p class="settings-help">Paste the Web App URL and secret token from your Apps Script deployment. These stay on this device only.</p>
 
       <div class="field">
@@ -131,11 +134,15 @@
         </span>
       </div>
 
-      <button id="backBtn" class="link-btn" type="button">&larr; Back</button>
     </section>
 
     <section id="browseView" class="view" hidden>
-      <h2 class="settings-title">Browse people</h2>
+      <div class="view-head">
+        <h2 class="settings-title">Browse people</h2>
+        <button id="browseBackBtn" class="link-btn back-btn" type="button">&larr; Back</button>
+      </div>
+
+      <p class="loader" id="browseLoading" role="status" hidden><span class="spinner" aria-hidden="true"></span>Loading your connections…</p>
 
       <div class="browse-filter-wrap" id="browseFilterWrap">
         <button type="button" class="tag-suggestion tag-suggestion-all filter-btn" id="browseFilterBtn" aria-expanded="false" aria-controls="browseFilter">
@@ -147,11 +154,15 @@
       <div class="browse-list" id="browseList"></div>
       <p id="browseEmpty" class="empty-text browse-empty" hidden>No connections tagged yet.</p>
 
-      <button id="browseBackBtn" class="link-btn" type="button">&larr; Back</button>
     </section>
 
     <section id="tagManagerView" class="view" hidden>
-      <h2 class="settings-title">Tag manager</h2>
+      <div class="view-head">
+        <h2 class="settings-title">Tag manager</h2>
+        <button id="tagManagerBackBtn" class="link-btn back-btn" type="button">&larr; Back</button>
+      </div>
+
+      <p class="loader" id="tagManagerLoading" role="status" hidden><span class="spinner" aria-hidden="true"></span>Loading your tags…</p>
 
       <div class="tm-sort" id="tagManagerSort" role="radiogroup" aria-label="Sort tags">
         <span class="tm-sort-label">Sort</span>
@@ -163,7 +174,6 @@
       <div class="tm-list" id="tagManagerList"></div>
       <p id="tagManagerEmpty" class="empty-text browse-empty" hidden>No tags yet.</p>
 
-      <button id="tagManagerBackBtn" class="link-btn" type="button">&larr; Back</button>
     </section>
 
   </main>

@@ -7,6 +7,7 @@ import {
   elBrowseFilterSummary,
   elBrowseFilterWrap,
   elBrowseList,
+  elBrowseLoading,
   elBrowseToggle,
   showView,
 } from "./dom.js";
@@ -211,17 +212,32 @@ function renderBrowseList() {
   }
 }
 
+let loadToken = 0; // ignore a slower, older load if the page was reopened meanwhile
+
 async function openBrowse() {
+  const myToken = ++loadToken;
   showView("browse");
+  filterOpen = false;
+  elBrowseFilter.hidden = true;
   elBrowseFilter.innerHTML = "";
   elBrowseList.innerHTML = "";
   elBrowseEmpty.hidden = true;
+  elBrowseFilterWrap.hidden = true;
+  elBrowseLoading.hidden = false;
 
-  const { records } = await fetchAllRecords();
+  let records;
+  try {
+    ({ records } = await fetchAllRecords());
+  } finally {
+    if (myToken === loadToken) {
+      elBrowseLoading.hidden = true;
+      elBrowseFilterWrap.hidden = false;
+    }
+  }
+  if (myToken !== loadToken) return;
   browseRecords = records;
   allSelected = true;
   selectedTags = new Set(collectTagCounts(records).map((t) => t.label.toLowerCase()));
-  filterOpen = false;
   rerender();
   setKnownTagsFromRecords(records);
 }

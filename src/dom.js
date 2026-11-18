@@ -40,6 +40,7 @@ export const elSettingsSavedConfirm = $("settingsSavedConfirm");
 
 // Browse people
 export const elBrowseToggle = $("browseToggle");
+export const elBrowseLoading = $("browseLoading");
 export const elBrowseFilterWrap = $("browseFilterWrap");
 export const elBrowseFilterBtn = $("browseFilterBtn");
 export const elBrowseFilterSummary = $("browseFilterSummary");
@@ -50,6 +51,7 @@ export const elBrowseBackBtn = $("browseBackBtn");
 
 // Tag manager
 export const elTagManagerToggle = $("tagManagerToggle");
+export const elTagManagerLoading = $("tagManagerLoading");
 export const elTagManagerSort = $("tagManagerSort");
 export const elTagManagerList = $("tagManagerList");
 export const elTagManagerEmpty = $("tagManagerEmpty");

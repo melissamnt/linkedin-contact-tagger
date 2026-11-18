@@ -1,7 +1,14 @@
 /* Tag manager: every tag with how many contacts use it, sortable, each
    renamable and recolorable. (Browsing people by tag is browse-view.js.) */
 
-import { elTagManagerEmpty, elTagManagerList, elTagManagerSort, elTagManagerToggle, showView } from "./dom.js";
+import {
+  elTagManagerEmpty,
+  elTagManagerList,
+  elTagManagerLoading,
+  elTagManagerSort,
+  elTagManagerToggle,
+  showView,
+} from "./dom.js";
 import { fetchAllRecords, renameTagRemote } from "./sheet-sync.js";
 import { renameTagInLocalRecords } from "./storage.js";
 import { applyTagRename } from "./profile-view.js";
@@ -194,14 +201,28 @@ async function saveTagEdit(from, to, colorIndex) {
   tmRecords = tmRecords.map((r) => (r.tags ? { ...r, tags: renameTagInList(r.tags, from, to) } : r));
 }
 
+let loadToken = 0; // ignore a slower, older load if the page was reopened meanwhile
+
 async function openTagManager() {
+  const myToken = ++loadToken;
   showView("tagManager");
   editingTag = null;
   elTagManagerList.innerHTML = "";
   elTagManagerEmpty.hidden = true;
   renderSort();
+  elTagManagerSort.hidden = true;
+  elTagManagerLoading.hidden = false;
 
-  const { records } = await fetchAllRecords();
+  let records;
+  try {
+    ({ records } = await fetchAllRecords());
+  } finally {
+    if (myToken === loadToken) {
+      elTagManagerLoading.hidden = true;
+      elTagManagerSort.hidden = false;
+    }
+  }
+  if (myToken !== loadToken) return;
   tmRecords = records;
   renderTagList();
   setKnownTagsFromRecords(records);
