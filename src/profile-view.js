@@ -161,7 +161,9 @@ function renderTopSuggestions(matches) {
     elTagSuggestions.appendChild(btn);
   }
 
-  if (matches.length > SUGGESTION_LIMIT) {
+  // Always offered next to the suggestions (the row itself only shows when
+  // something matches), so the full list is one click away.
+  if (matches.length) {
     const more = document.createElement("button");
     more.type = "button";
     more.className = "tag-suggestion tag-suggestion-all";
