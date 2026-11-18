@@ -84,6 +84,22 @@ export function filterTags(known, applied, query) {
   return known.filter((t) => !skip.has(t.toLowerCase()) && t.toLowerCase().includes(q));
 }
 
+// Every tag — known ones plus any applied tag not known yet — whose name
+// contains `query`, A–Z, each flagged with whether it's on the contact.
+export function listAllTags(known, applied, query) {
+  const q = query.trim().toLowerCase();
+  const selected = new Set(applied.map((t) => t.toLowerCase()));
+  const byKey = new Map();
+  for (const tag of [...applied, ...known]) {
+    const key = tag.toLowerCase();
+    if (!byKey.has(key)) byKey.set(key, tag); // applied spelling wins
+  }
+  return [...byKey.entries()]
+    .filter(([key]) => key.includes(q))
+    .sort(([, a], [, b]) => a.localeCompare(b))
+    .map(([key, tag]) => ({ tag, selected: selected.has(key) }));
+}
+
 export function getKnownTags() {
   return knownTags;
 }

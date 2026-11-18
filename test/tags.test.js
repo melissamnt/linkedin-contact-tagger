@@ -7,6 +7,7 @@ import {
   collectTagCounts,
   filterTags,
   getKnownTags,
+  listAllTags,
   loadTagColorOverrides,
   markTagsUsed,
   setKnownTagsFromRecords,
@@ -89,4 +90,15 @@ test("known tags: built most-recent first; markTagsUsed moves used tags to the f
   assert.deepEqual(getKnownTags(), ["Tech", "SF"]);
   markTagsUsed(["sf", "Design", "DESIGN"]);
   assert.deepEqual(getKnownTags(), ["SF", "Design", "Tech"]); // known spelling kept, no case duplicates
+});
+
+test("listAllTags: every tag A–Z, applied ones flagged, filtered by query", () => {
+  const known = ["Tech", "Startup", "SF"];
+  assert.deepEqual(listAllTags(known, ["startup", "Brand new"], ""), [
+    { tag: "Brand new", selected: true }, // applied but not known yet still listed
+    { tag: "SF", selected: false },
+    { tag: "startup", selected: true }, // applied spelling wins, no duplicate
+    { tag: "Tech", selected: false },
+  ]);
+  assert.deepEqual(listAllTags(known, ["Startup"], "STAR"), [{ tag: "Startup", selected: true }]);
 });

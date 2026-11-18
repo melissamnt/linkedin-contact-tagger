@@ -34,7 +34,7 @@ import {
 } from "./storage.js";
 import { fetchAllRecords, fetchRemote, pushRemote } from "./sheet-sync.js";
 import { callClaudeSuggestion, extractVisibleProfileText } from "./claude.js";
-import { filterTags, getKnownTags, markTagsUsed, setKnownTagsFromRecords, tagColorClass } from "./tags.js";
+import { filterTags, getKnownTags, listAllTags, markTagsUsed, setKnownTagsFromRecords, tagColorClass } from "./tags.js";
 
 /* ---------- State ---------- */
 
@@ -60,7 +60,7 @@ function markDirty() {
 
 function renderChips() {
   elChipsList.innerHTML = "";
-  for (const [index, tag] of currentTags.entries()) {
+  for (const tag of currentTags) {
     const chip = document.createElement("span");
     chip.className = `chip ${tagColorClass(tag)}`;
     chip.textContent = tag;
@@ -73,16 +73,21 @@ function renderChips() {
     // Without this, clicking "×" while typing blurs the input first; the blur
     // handler re-renders the chips, the button vanishes and the click is lost.
     remove.addEventListener("mousedown", (e) => e.preventDefault());
-    remove.addEventListener("click", () => {
-      currentTags.splice(index, 1);
-      markDirty();
-      renderChips();
-      renderTagSuggestions();
-    });
+    remove.addEventListener("click", () => removeTag(tag));
 
     chip.appendChild(remove);
     elChipsList.appendChild(chip);
   }
+}
+
+function removeTag(tag) {
+  const key = tag.toLowerCase();
+  const before = currentTags.length;
+  currentTags = currentTags.filter((t) => t.toLowerCase() !== key);
+  if (currentTags.length === before) return;
+  markDirty();
+  renderChips();
+  renderTagSuggestions();
 }
 
 function addTag(raw) {
@@ -111,7 +116,7 @@ export async function refreshKnownTags() {
 }
 
 const SUGGESTION_LIMIT = 8;
-let allTagsOpen = false; // the full, scrollable "All tags" list is showing instead of the top suggestions
+let allTagsOpen = false; // the "All tags" multi-select list is showing instead of the top suggestions
 
 // Picking a tag from the suggestions or the All tags list. Runs on mousedown
 // (not click) with preventDefault, so the input never blurs — its blur
@@ -148,9 +153,8 @@ function hideTagMenus() {
 }
 
 function renderTagSuggestions() {
-  const matches = filterTags(getKnownTags(), currentTags, elTagsInput.value);
-  if (allTagsOpen) renderAllTagsList(matches);
-  else renderTopSuggestions(matches);
+  if (allTagsOpen) renderAllTagsList(listAllTags(getKnownTags(), currentTags, elTagsInput.value));
+  else renderTopSuggestions(filterTags(getKnownTags(), currentTags, elTagsInput.value));
 }
 
 function renderTopSuggestions(matches) {
@@ -181,7 +185,9 @@ function renderTopSuggestions(matches) {
   elTagSuggestions.appendChild(all);
 }
 
-function renderAllTagsList(matches) {
+// Multi-select over every tag: chosen ones are highlighted in their color
+// with a check, and clicking a row toggles it on or off the contact.
+function renderAllTagsList(rows) {
   elTagSuggestions.hidden = true;
   elTagList.hidden = false;
   elTagList.innerHTML = "";
@@ -190,7 +196,10 @@ function renderAllTagsList(matches) {
   head.className = "tag-list-head";
   const title = document.createElement("span");
   title.className = "tag-list-title";
-  title.textContent = elTagsInput.value.trim() ? `Matching tags (${matches.length})` : `All tags (${matches.length})`;
+  const chosen = currentTags.length;
+  title.textContent = elTagsInput.value.trim()
+    ? `Matching tags (${rows.length})`
+    : `All tags (${rows.length}) · ${chosen} selected`;
   const done = document.createElement("button");
   done.type = "button";
   done.className = "tag-list-done";
@@ -201,22 +210,37 @@ function renderAllTagsList(matches) {
 
   const items = document.createElement("div");
   items.className = "tag-list-items";
-  if (matches.length === 0) {
+  items.setAttribute("role", "group");
+  items.setAttribute("aria-label", "All tags");
+  if (rows.length === 0) {
     const empty = document.createElement("p");
     empty.className = "tag-list-empty";
     empty.textContent = "No matching tags — press Enter to add it as a new tag.";
     items.appendChild(empty);
   }
-  for (const tag of [...matches].sort((a, b) => a.localeCompare(b))) {
+  for (const { tag, selected } of rows) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "tag-list-item";
+    btn.className = selected ? `tag-list-item is-selected ${tagColorClass(tag)}` : "tag-list-item";
+    btn.setAttribute("aria-pressed", String(selected));
+    const check = document.createElement("span");
+    check.className = "tag-list-check";
+    check.setAttribute("aria-hidden", "true");
+    check.textContent = selected ? "✓" : "";
     const dot = document.createElement("span");
     dot.className = `tag-list-dot ${tagColorClass(tag)}`;
     const label = document.createElement("span");
     label.textContent = tag;
-    btn.append(dot, label);
-    pickTagOnMousedown(btn, tag);
+    btn.append(check, dot, label);
+    // mousedown + preventDefault keeps focus in the input (see pickTagOnMousedown).
+    btn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      if (selected) removeTag(tag);
+      else addTag(tag);
+      elTagsInput.value = "";
+      renderTagSuggestions();
+      elTagsInput.focus();
+    });
     items.appendChild(btn);
   }
   elTagList.appendChild(items);

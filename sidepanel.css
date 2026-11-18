@@ -555,7 +555,6 @@ main {
   gap: 8px;
   width: 100%;
   padding: 7px 8px;
-  background: transparent;
   border: none;
   border-radius: var(--radius-sm);
   font-size: 13px;
@@ -563,8 +562,39 @@ main {
   text-align: left;
 }
 
-.tag-list-item:hover {
+/* Unselected rows are plain; selected ones keep their tag-color-N background. */
+.tag-list-item:not(.is-selected) {
+  background: transparent;
+}
+
+.tag-list-item:not(.is-selected):hover {
   background: var(--bg);
+}
+
+.tag-list-item.is-selected {
+  font-weight: 600;
+}
+
+/* Selected rows take the tag's own chip color (tag-color-N); keep it on hover. */
+.tag-list-item.is-selected:hover {
+  filter: brightness(0.96);
+}
+
+.tag-list-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.tag-list-item.is-selected .tag-list-check {
+  border-color: currentColor;
 }
 
 .tag-list-dot {
