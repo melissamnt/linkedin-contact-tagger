@@ -34,7 +34,7 @@ import {
 } from "./storage.js";
 import { fetchAllRecords, fetchRemote, pushRemote } from "./sheet-sync.js";
 import { callClaudeSuggestion, extractVisibleProfileText } from "./claude.js";
-import { filterTags, getKnownTags, listAllTags, markTagsUsed, setKnownTagsFromRecords, tagColorClass, tagColorIndex } from "./tags.js";
+import { filterTags, getKnownTags, listAllTags, markTagsUsed, setKnownTagsFromRecords, tagColorClass } from "./tags.js";
 
 /* ---------- State ---------- */
 
@@ -221,7 +221,7 @@ function renderAllTagsList(rows) {
   for (const { tag, selected } of rows) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = selected ? `tag-list-item is-selected tag-tint-${tagColorIndex(tag)}` : "tag-list-item";
+    btn.className = selected ? "tag-list-item is-selected" : "tag-list-item";
     btn.setAttribute("aria-pressed", String(selected));
     const check = document.createElement("span");
     check.className = "tag-list-check";

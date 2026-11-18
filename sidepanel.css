@@ -568,25 +568,17 @@ main {
 }
 
 .tag-list-item:not(.is-selected):hover {
-  background: var(--bg);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
 }
 
-/* Selected rows get a soft wash of the tag's color (tag-tint-N sets --tint),
-   so the text stays easy to read; the dot and check carry the full color. */
-.tag-tint-0 { --tint: var(--tag-0-bg); --tint-ink: var(--tag-0-text); }
-.tag-tint-1 { --tint: var(--tag-1-bg); --tint-ink: var(--tag-1-text); }
-.tag-tint-2 { --tint: var(--tag-2-bg); --tint-ink: var(--tag-2-text); }
-.tag-tint-3 { --tint: var(--tag-3-bg); --tint-ink: var(--tag-3-text); }
-.tag-tint-4 { --tint: var(--tag-4-bg); --tint-ink: var(--tag-4-text); }
-.tag-tint-5 { --tint: var(--tag-5-bg); --tint-ink: var(--tag-5-text); }
-
+/* Selected rows get a neutral gray, not the tag's color — the dot shows that. */
 .tag-list-item.is-selected {
-  background: color-mix(in srgb, var(--tint) 14%, transparent);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
   font-weight: 600;
 }
 
 .tag-list-item.is-selected:hover {
-  background: color-mix(in srgb, var(--tint) 22%, transparent);
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
 }
 
 .tag-list-check {
@@ -603,9 +595,9 @@ main {
 }
 
 .tag-list-item.is-selected .tag-list-check {
-  background: var(--tint);
-  border-color: var(--tint);
-  color: var(--tint-ink);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg-elevated);
 }
 
 .tag-list-dot {
