@@ -973,8 +973,78 @@ main {
   font-size: 12.5px;
 }
 
-.tm-sort[hidden] {
+.tm-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tm-toolbar[hidden] {
   display: none;
+}
+
+.tm-toolbar .tm-sort {
+  margin-bottom: 0;
+}
+
+.tm-expand-all {
+  padding: 2px 0;
+  background: none;
+  border: none;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+
+.tm-expand-all:hover {
+  color: var(--ink);
+}
+
+.tm-expand-all[hidden] {
+  display: none;
+}
+
+.tm-toggle,
+.tm-toggle-spacer {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.tm-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: -4px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+}
+
+.tm-toggle svg {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--dur) var(--ease);
+}
+
+.tm-toggle.is-open svg {
+  transform: rotate(90deg);
+}
+
+.tm-toggle:hover {
+  color: var(--ink);
+}
+
+.tm-toggle:focus-visible,
+.tm-expand-all:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+.tm-toggle-spacer {
+  margin-right: -4px;
 }
 
 .tm-sort-label {
@@ -1019,7 +1089,7 @@ main {
 
 /* A family's tags, indented under the family row. */
 .tm-row.is-child {
-  padding-left: 22px;
+  padding-left: 36px;
 }
 
 .tm-name {

@@ -171,11 +171,14 @@
 
       <p class="loader" id="tagManagerLoading" role="status" hidden><span class="spinner" aria-hidden="true"></span>Loading your tags…</p>
 
-      <div class="tm-sort" id="tagManagerSort" role="radiogroup" aria-label="Sort tags">
-        <span class="tm-sort-label">Sort</span>
-        <button type="button" role="radio" data-sort="count">Most used</button>
-        <button type="button" role="radio" data-sort="az">A–Z</button>
-        <button type="button" role="radio" data-sort="za">Z–A</button>
+      <div class="tm-toolbar" id="tagManagerToolbar">
+        <div class="tm-sort" id="tagManagerSort" role="radiogroup" aria-label="Sort tags">
+          <span class="tm-sort-label">Sort</span>
+          <button type="button" role="radio" data-sort="count">Most used</button>
+          <button type="button" role="radio" data-sort="az">A–Z</button>
+          <button type="button" role="radio" data-sort="za">Z–A</button>
+        </div>
+        <button type="button" class="tm-expand-all" id="tagManagerExpandAll" hidden>Expand all</button>
       </div>
 
       <div class="tm-list" id="tagManagerList"></div>
