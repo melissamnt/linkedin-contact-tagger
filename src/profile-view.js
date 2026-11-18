@@ -39,9 +39,13 @@ import {
   getKnownTags,
   listAllTags,
   markTagsUsed,
+  matchFamilySpelling,
+  normalizeTag,
+  parseTag,
   renameTagInList,
   setKnownTagsFromRecords,
   tagColorClass,
+  tagLabel,
 } from "./tags.js";
 
 /* ---------- State ---------- */
@@ -71,7 +75,8 @@ function renderChips() {
   for (const tag of currentTags) {
     const chip = document.createElement("span");
     chip.className = `chip ${tagColorClass(tag)}`;
-    chip.textContent = tag;
+    chip.textContent = tagLabel(tag); // the family shows through the color
+    chip.title = tag;
 
     const remove = document.createElement("button");
     remove.type = "button";
@@ -101,7 +106,12 @@ function removeTag(tag) {
 function addTag(raw) {
   // The Sheet stores tags comma-separated, so a comma can never live inside
   // a tag — split pasted input like "SF, Tech" into separate tags up front.
-  const parts = raw.split(",").map((t) => t.trim()).filter(Boolean);
+  // "Family > Tag" is tidied to the stored form ("education>ds4a" -> "education > ds4a").
+  const parts = raw
+    .split(",")
+    .map(normalizeTag)
+    .filter(Boolean)
+    .map((t) => matchFamilySpelling(t, [...getKnownTags(), ...currentTags]));
   if (!parts.length) return;
   for (const tag of parts) {
     const exists = currentTags.some((t) => t.toLowerCase() === tag.toLowerCase());
@@ -175,6 +185,18 @@ function renderTagSuggestions() {
   else renderTopSuggestions(filterTags(getKnownTags(), currentTags, elTagsInput.value));
 }
 
+// "Stanford LEAD" with a small grey "Education ›" in front when the tag has a family.
+function appendTagName(el, tag) {
+  const { family, name } = parseTag(tag);
+  if (family) {
+    const fam = document.createElement("span");
+    fam.className = "tag-family-prefix";
+    fam.textContent = `${family} › `;
+    el.appendChild(fam);
+  }
+  el.appendChild(document.createTextNode(name));
+}
+
 function renderTopSuggestions(matches) {
   elTagList.hidden = true;
   elTagSuggestions.innerHTML = "";
@@ -185,7 +207,7 @@ function renderTopSuggestions(matches) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "tag-suggestion";
-      btn.textContent = tag;
+      appendTagName(btn, tag);
       pickTagOnMousedown(btn, tag);
       elTagSuggestions.appendChild(btn);
     }
@@ -236,10 +258,24 @@ function renderAllTagsList(rows) {
     empty.textContent = "No matching tags — press Enter to add it as a new tag.";
     items.appendChild(empty);
   }
+  // Rows arrive grouped by family; a family's tags get its name as a small
+  // heading (unless the family is a tag itself, which then heads the group).
+  let lastGroup = null;
   for (const { tag, selected } of rows) {
+    const { family, name } = parseTag(tag);
+    const group = (family || name).toLowerCase();
+    if (family && group !== lastGroup) {
+      const heading = document.createElement("div");
+      heading.className = "tag-list-group";
+      heading.textContent = family;
+      items.appendChild(heading);
+    }
+    lastGroup = group;
+
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = selected ? "tag-list-item is-selected" : "tag-list-item";
+    btn.className = `tag-list-item${selected ? " is-selected" : ""}${family ? " is-child" : ""}`;
+    btn.title = tag;
     btn.setAttribute("aria-pressed", String(selected));
     const check = document.createElement("span");
     check.className = "tag-list-check";
@@ -248,7 +284,7 @@ function renderAllTagsList(rows) {
     const dot = document.createElement("span");
     dot.className = `tag-list-dot ${tagColorClass(tag)}`;
     const label = document.createElement("span");
-    label.textContent = tag;
+    label.textContent = name;
     btn.append(check, dot, label);
     // mousedown + preventDefault keeps focus in the input (see pickTagOnMousedown).
     btn.addEventListener("mousedown", (e) => {
